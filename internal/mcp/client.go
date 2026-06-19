@@ -19,13 +19,22 @@ type Client struct {
 }
 
 // Connect dials a target and returns an initialized client. A target is either
-// an http(s):// URL (handled in a later slice) or a command to spawn over stdio
-// (for example "uvx mcp-server-time").
+// an http(s):// URL served over the streamable HTTP transport or a command to
+// spawn over stdio (for example "uvx mcp-server-time").
 func Connect(ctx context.Context, target string) (*Client, error) {
 	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
-		return nil, fmt.Errorf("http transport is not implemented yet")
+		return connectHTTP(ctx, target)
 	}
 	return connectStdio(ctx, target)
+}
+
+func connectHTTP(ctx context.Context, endpoint string) (*Client, error) {
+	client := sdk.NewClient(&sdk.Implementation{Name: "mctop", Version: "dev"}, nil)
+	sess, err := client.Connect(ctx, &sdk.StreamableClientTransport{Endpoint: endpoint}, nil)
+	if err != nil {
+		return nil, fmt.Errorf("connect to %q: %w", endpoint, err)
+	}
+	return &Client{sess: sess}, nil
 }
 
 func connectStdio(ctx context.Context, command string) (*Client, error) {
