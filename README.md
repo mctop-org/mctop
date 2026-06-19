@@ -23,6 +23,13 @@ URL).
 ## Install
 
 ```
+curl -fsSL https://raw.githubusercontent.com/aloki-alok/mctop/main/install.sh | sh
+```
+
+Or with Homebrew, or the Go toolchain:
+
+```
+brew install aloki-alok/tap/mctop
 go install github.com/aloki-alok/mctop@latest
 ```
 
@@ -37,6 +44,18 @@ mctop test <spec.yaml>         run a contract, exit 0 on pass, 1 on fail
 
 A target is either a command to spawn (`"uvx mcp-server-time"`) or an
 `http(s)://` URL.
+
+### Interactive mode
+
+Run `mctop <target>` with no subcommand to open the TUI: browse tools,
+resources, and prompts; press enter on a tool to fill its arguments in a
+schema-driven form and run it; read the result, then go again.
+
+```
+↑↓ move    enter open    / search    tab switch section    q quit
+```
+
+In the result view: `r` re-runs, `e` edits the arguments, `esc` goes back.
 
 For OAuth-protected servers, log in once and mctop handles the token after that:
 
