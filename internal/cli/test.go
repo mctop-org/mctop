@@ -28,7 +28,7 @@ func Test(args []string) int {
 	ctx, cancel := context.WithTimeout(context.Background(), dialTimeout)
 	defer cancel()
 
-	client, err := mcp.Connect(ctx, s.Server.Target(), mcp.Options{Headers: s.Server.Headers})
+	client, err := mcp.Connect(ctx, s.Server.Target(), mcp.Options{Headers: withAuth(ctx, s.Server.Target(), s.Server.Headers)})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "mctop:", err)
 		return 1

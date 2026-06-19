@@ -12,6 +12,10 @@ import (
 // never hangs the command.
 const dialTimeout = 30 * time.Second
 
+// loginTimeout bounds the interactive OAuth flow, which waits on a human in a
+// browser, so it is far longer than dialTimeout.
+const loginTimeout = 5 * time.Minute
+
 // extractHeaders pulls repeated -H/--header "Name: value" flags out of args and
 // returns them alongside the remaining positional arguments. It lets every
 // subcommand accept auth headers (a bearer token is just -H "Authorization:

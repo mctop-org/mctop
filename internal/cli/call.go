@@ -34,9 +34,10 @@ func Call(args []string) int {
 	ctx, cancel := context.WithTimeout(context.Background(), dialTimeout)
 	defer cancel()
 
-	client, err := mcp.Connect(ctx, target, mcp.Options{Headers: headers})
+	client, err := mcp.Connect(ctx, target, mcp.Options{Headers: withAuth(ctx, target, headers)})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "mctop:", err)
+		hintLogin(target, err)
 		return 1
 	}
 	defer client.Close()
