@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os/exec"
 	"strings"
 
@@ -18,23 +19,48 @@ type Client struct {
 	sess *sdk.ClientSession
 }
 
+// Options tunes how Connect dials a target.
+type Options struct {
+	// Headers are sent on every HTTP request, the place a bearer token or other
+	// auth lives. They are ignored for stdio targets, which have no request
+	// headers.
+	Headers map[string]string
+}
+
 // Connect dials a target and returns an initialized client. A target is either
 // an http(s):// URL served over the streamable HTTP transport or a command to
 // spawn over stdio (for example "uvx mcp-server-time").
-func Connect(ctx context.Context, target string) (*Client, error) {
+func Connect(ctx context.Context, target string, opts Options) (*Client, error) {
 	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
-		return connectHTTP(ctx, target)
+		return connectHTTP(ctx, target, opts.Headers)
 	}
 	return connectStdio(ctx, target)
 }
 
-func connectHTTP(ctx context.Context, endpoint string) (*Client, error) {
+func connectHTTP(ctx context.Context, endpoint string, headers map[string]string) (*Client, error) {
 	client := sdk.NewClient(&sdk.Implementation{Name: "mctop", Version: "dev"}, nil)
-	sess, err := client.Connect(ctx, &sdk.StreamableClientTransport{Endpoint: endpoint}, nil)
+	transport := &sdk.StreamableClientTransport{Endpoint: endpoint}
+	if len(headers) > 0 {
+		transport.HTTPClient = &http.Client{Transport: headerRoundTripper{headers: headers}}
+	}
+	sess, err := client.Connect(ctx, transport, nil)
 	if err != nil {
 		return nil, fmt.Errorf("connect to %q: %w", endpoint, err)
 	}
 	return &Client{sess: sess}, nil
+}
+
+// headerRoundTripper adds fixed headers to every request before delegating to
+// the default transport.
+type headerRoundTripper struct {
+	headers map[string]string
+}
+
+func (h headerRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	for k, v := range h.headers {
+		req.Header.Set(k, v)
+	}
+	return http.DefaultTransport.RoundTrip(req)
 }
 
 func connectStdio(ctx context.Context, command string) (*Client, error) {

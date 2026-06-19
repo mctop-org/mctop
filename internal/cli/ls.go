@@ -20,7 +20,7 @@ func LS(args []string) int {
 	ctx, cancel := context.WithTimeout(context.Background(), dialTimeout)
 	defer cancel()
 
-	client, err := mcp.Connect(ctx, target)
+	client, err := mcp.Connect(ctx, target, mcp.Options{})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "mctop:", err)
 		return 1
