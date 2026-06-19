@@ -55,9 +55,11 @@ type model struct {
 	resources []*sdk.Resource
 	prompts   []*sdk.Prompt
 
-	screen  screen
-	section section
-	cursor  [3]int
+	screen    screen
+	section   section
+	cursor    int // position within the active section's visible (filtered) items
+	query     string
+	searching bool
 
 	width, height int
 
@@ -118,20 +120,27 @@ func (m model) updateBrowse(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
+	if m.searching {
+		return m.updateSearch(key)
+	}
 	switch key.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
+	case "/":
+		m.searching = true
+	case "esc":
+		m.query, m.cursor = "", 0
 	case "tab":
-		m.section = (m.section + 1) % 3
+		m.section, m.cursor, m.query = (m.section+1)%3, 0, ""
 	case "shift+tab":
-		m.section = (m.section + 2) % 3
+		m.section, m.cursor, m.query = (m.section+2)%3, 0, ""
 	case "up", "k":
-		if m.cursor[m.section] > 0 {
-			m.cursor[m.section]--
+		if m.cursor > 0 {
+			m.cursor--
 		}
 	case "down", "j":
-		if m.cursor[m.section] < m.count(m.section)-1 {
-			m.cursor[m.section]++
+		if m.cursor < len(m.visibleItems())-1 {
+			m.cursor++
 		}
 	case "enter", "right", "l":
 		return m.open()
@@ -139,13 +148,44 @@ func (m model) updateBrowse(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// updateSearch handles keys while the search box is active: typing refines the
+// query, arrows move within the matches, enter opens the match, esc cancels.
+func (m model) updateSearch(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch key.String() {
+	case "ctrl+c":
+		return m, tea.Quit
+	case "esc":
+		m.searching, m.query, m.cursor = false, "", 0
+	case "enter":
+		m.searching = false
+		return m.open()
+	case "backspace":
+		if m.query != "" {
+			m.query, m.cursor = m.query[:len(m.query)-1], 0
+		}
+	case "up":
+		if m.cursor > 0 {
+			m.cursor--
+		}
+	case "down":
+		if m.cursor < len(m.visibleItems())-1 {
+			m.cursor++
+		}
+	default:
+		if len(key.Runes) > 0 {
+			m.query, m.cursor = m.query+string(key.Runes), 0
+		}
+	}
+	return m, nil
+}
+
 // open acts on the selected item: a tool opens its argument form, a resource is
 // read, and a prompt is rendered.
 func (m model) open() (tea.Model, tea.Cmd) {
-	if m.count(m.section) == 0 {
+	i := m.selected()
+	if i < 0 {
 		return m, nil
 	}
-	i := m.cursor[m.section]
 	switch m.section {
 	case secTools:
 		return m.openForm(m.tools[i]), nil
@@ -158,6 +198,29 @@ func (m model) open() (tea.Model, tea.Cmd) {
 		p := m.prompts[i]
 		return m.dispatch(p.Name, m.getPrompt(p.Name))
 	}
+}
+
+// visibleItems is the indices of the active section's items matching the search
+// query, or all of them when the query is empty.
+func (m model) visibleItems() []int {
+	q := strings.ToLower(m.query)
+	var idx []int
+	for i := 0; i < m.count(m.section); i++ {
+		if q == "" || strings.Contains(strings.ToLower(m.itemLabel(m.section, i)), q) {
+			idx = append(idx, i)
+		}
+	}
+	return idx
+}
+
+// selected returns the real item index under the cursor, or -1 when nothing is
+// visible.
+func (m model) selected() int {
+	vis := m.visibleItems()
+	if m.cursor >= len(vis) {
+		return -1
+	}
+	return vis[m.cursor]
 }
 
 func (m model) count(s section) int {
@@ -211,7 +274,10 @@ func (m model) leftPane() string {
 		label := fmt.Sprintf("%s (%d)", strings.ToUpper(s.String()), m.count(s))
 		if s == m.section {
 			b.WriteString(accent.Render(label) + "\n")
-			b.WriteString(m.itemList(s))
+			if m.searching || m.query != "" {
+				b.WriteString(dim.Render("  /"+m.query) + "\n")
+			}
+			b.WriteString(m.itemList())
 		} else {
 			b.WriteString(dim.Render(label) + "\n")
 		}
@@ -219,12 +285,12 @@ func (m model) leftPane() string {
 	return lipgloss.NewStyle().Width(34).Render(b.String())
 }
 
-func (m model) itemList(s section) string {
+func (m model) itemList() string {
 	var b strings.Builder
-	for i := 0; i < m.count(s); i++ {
+	for pos, i := range m.visibleItems() {
 		prefix := "  "
-		label := m.itemLabel(s, i)
-		if i == m.cursor[s] {
+		label := m.itemLabel(m.section, i)
+		if pos == m.cursor {
 			prefix = cursorS.Render("▸ ")
 			label = bold.Render(label)
 		}
@@ -250,10 +316,11 @@ func (m model) rightPane() string {
 		width = 10
 	}
 	style := lipgloss.NewStyle().Width(width).PaddingLeft(2)
-	if m.count(m.section) == 0 {
+	i := m.selected()
+	if i < 0 {
 		return style.Render(dim.Render("nothing here"))
 	}
-	return style.Render(m.detail(m.section, m.cursor[m.section]))
+	return style.Render(m.detail(m.section, i))
 }
 
 func (m model) detail(s section, i int) string {
@@ -290,5 +357,8 @@ func (m model) toolDetail(t *sdk.Tool) string {
 }
 
 func (m model) footerView() string {
-	return m.rule() + "\n" + dim.Render("  ↑↓ move   enter call   tab section   q quit")
+	if m.searching {
+		return m.rule() + "\n" + accent.Render("  /"+m.query) + dim.Render("   enter open   esc cancel")
+	}
+	return m.rule() + "\n" + dim.Render("  ↑↓ move   enter open   / search   tab section   q quit")
 }
