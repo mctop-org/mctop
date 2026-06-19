@@ -52,7 +52,7 @@ func TUI(args []string) int {
 		return 1
 	}
 
-	program := tea.NewProgram(tui.New(target, client, tools, resources, prompts), tea.WithAltScreen())
+	program := tea.NewProgram(tui.New(ctx, target, client, tools, resources, prompts), tea.WithAltScreen())
 	if _, err := program.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "mctop:", err)
 		return 1
