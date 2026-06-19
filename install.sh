@@ -62,10 +62,15 @@ grep -q "$sum" "${tmp}/checksums.txt" || err "checksum mismatch, refusing to ins
 
 tar -xzf "${tmp}/${archive}" -C "$tmp" mctop || err "could not extract mctop"
 
-dir="${MCTOP_INSTALL_DIR:-/usr/local/bin}"
-if [ ! -d "$dir" ] || [ ! -w "$dir" ]; then
-	dir="${HOME}/.local/bin"
-	mkdir -p "$dir"
+if [ -n "${MCTOP_INSTALL_DIR:-}" ]; then
+	dir="$MCTOP_INSTALL_DIR"
+	mkdir -p "$dir" || err "cannot create $dir"
+else
+	dir="/usr/local/bin"
+	if [ ! -w "$dir" ]; then
+		dir="${HOME}/.local/bin"
+		mkdir -p "$dir"
+	fi
 fi
 install -m 0755 "${tmp}/mctop" "${dir}/mctop"
 
