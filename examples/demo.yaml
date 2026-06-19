@@ -1,0 +1,20 @@
+# Contract for the bundled demo server (examples/demoserver). Start it, then:
+#   mctop test examples/demo.yaml
+# If the server was started with DEMO_TOKEN set, uncomment headers below and run
+# with that token exported: DEMO_TOKEN=... mctop test examples/demo.yaml
+server:
+  url: "http://localhost:8080/mcp"
+  # headers:
+  #   Authorization: "Bearer ${DEMO_TOKEN}"
+expect:
+  tools:
+    - echo
+    - add
+calls:
+  - tool: add
+    args:
+      a: 2
+      b: 40
+    assert:
+      not_error: true
+      contains: "42"

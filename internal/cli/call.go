@@ -14,13 +14,18 @@ import (
 // pairs (each value parsed as JSON, falling back to a string) or as a single
 // --json object. A tool that reports an error exits non-zero.
 func Call(args []string) int {
-	if len(args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: mctop call <target> <tool> [key=value ...] | --json '<object>'")
+	headers, rest, err := extractHeaders(args)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "mctop:", err)
 		return 2
 	}
-	target, tool := args[0], args[1]
+	if len(rest) < 2 {
+		fmt.Fprintln(os.Stderr, "usage: mctop call <target> <tool> [key=value ...] | --json '<object>' [-H \"Name: value\"]")
+		return 2
+	}
+	target, tool := rest[0], rest[1]
 
-	toolArgs, err := parseToolArgs(args[2:])
+	toolArgs, err := parseToolArgs(rest[2:])
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "mctop:", err)
 		return 2
@@ -29,7 +34,7 @@ func Call(args []string) int {
 	ctx, cancel := context.WithTimeout(context.Background(), dialTimeout)
 	defer cancel()
 
-	client, err := mcp.Connect(ctx, target, mcp.Options{})
+	client, err := mcp.Connect(ctx, target, mcp.Options{Headers: headers})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "mctop:", err)
 		return 1

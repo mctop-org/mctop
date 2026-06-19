@@ -11,16 +11,21 @@ import (
 
 // LS connects to the target and prints its tools, resources, and prompts.
 func LS(args []string) int {
-	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: mctop ls <target>")
+	headers, rest, err := extractHeaders(args)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "mctop:", err)
 		return 2
 	}
-	target := strings.Join(args, " ")
+	if len(rest) == 0 {
+		fmt.Fprintln(os.Stderr, "usage: mctop ls <target> [-H \"Name: value\"]")
+		return 2
+	}
+	target := strings.Join(rest, " ")
 
 	ctx, cancel := context.WithTimeout(context.Background(), dialTimeout)
 	defer cancel()
 
-	client, err := mcp.Connect(ctx, target, mcp.Options{})
+	client, err := mcp.Connect(ctx, target, mcp.Options{Headers: headers})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "mctop:", err)
 		return 1

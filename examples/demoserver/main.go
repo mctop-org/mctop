@@ -45,6 +45,21 @@ func newServer() *sdk.Server {
 	return s
 }
 
+// requireToken guards next with a bearer token when one is configured; an empty
+// token leaves the endpoint open so the server runs unauthenticated by default.
+func requireToken(token string, next http.Handler) http.Handler {
+	if token == "" {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer "+token {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -53,7 +68,7 @@ func main() {
 
 	handler := sdk.NewStreamableHTTPHandler(func(*http.Request) *sdk.Server { return newServer() }, nil)
 	mux := http.NewServeMux()
-	mux.Handle("/mcp", handler)
+	mux.Handle("/mcp", requireToken(os.Getenv("DEMO_TOKEN"), handler))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintln(w, "ok")
 	})

@@ -20,9 +20,12 @@ type Spec struct {
 }
 
 // Server locates the server under test. Exactly one of Command or URL is set.
+// Headers are sent with each HTTP request; their values are expanded against the
+// environment ($TOKEN, ${TOKEN}) so a secret stays out of the committed spec.
 type Server struct {
-	Command string `yaml:"command"`
-	URL     string `yaml:"url"`
+	Command string            `yaml:"command"`
+	URL     string            `yaml:"url"`
+	Headers map[string]string `yaml:"headers"`
 }
 
 // Expect lists invariants about the server's surface.
@@ -65,6 +68,9 @@ func Load(path string) (*Spec, error) {
 	var s Spec
 	if err := dec.Decode(&s); err != nil {
 		return nil, fmt.Errorf("parse %s: %w", path, err)
+	}
+	for k, v := range s.Server.Headers {
+		s.Server.Headers[k] = os.ExpandEnv(v)
 	}
 	if err := s.validate(); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
