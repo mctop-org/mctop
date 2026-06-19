@@ -45,10 +45,8 @@ func run(args []string) int {
 		fmt.Fprintf(os.Stderr, "mctop: %q is not implemented yet\n", args[0])
 		return 2
 	default:
-		// A bare target opens the TUI; not implemented yet.
-		fmt.Fprintf(os.Stderr, "mctop: unknown command %q\n\n", args[0])
-		usage(os.Stderr)
-		return 2
+		// A bare http(s):// URL or spawn command opens the interactive TUI.
+		return cli.TUI(args)
 	}
 }
 
