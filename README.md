@@ -57,6 +57,15 @@ schema-driven form and run it; read the result, then go again.
 
 In the result view: `r` re-runs, `e` edits the arguments, `esc` goes back.
 
+### Updating
+
+```
+mctop upgrade
+```
+
+Replaces the binary with the latest release (checksum-verified). However you
+installed, this keeps it current.
+
 For OAuth-protected servers, log in once and mctop handles the token after that:
 
 ```
