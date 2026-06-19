@@ -62,13 +62,26 @@ type model struct {
 	width, height int
 
 	// form and result state, populated when those screens are active.
-	formTool  *sdk.Tool
-	inputs    []formInput
-	focus     int
-	running   bool
-	output    string
-	resultErr error
-	elapsed   string
+	formTool    *sdk.Tool
+	inputs      []formInput
+	focus       int
+	running     bool
+	resultTitle string
+	lastCmd     tea.Cmd
+	output      string
+	resultErr   error
+	elapsed     string
+}
+
+// dispatch starts an action (tool call, resource read, prompt render), showing
+// the result screen in a running state and remembering the command so r can
+// re-run it.
+func (m model) dispatch(title string, cmd tea.Cmd) (tea.Model, tea.Cmd) {
+	m.running = true
+	m.resultTitle = title
+	m.lastCmd = cmd
+	m.screen = result
+	return m, cmd
 }
 
 // New builds the model from an already-connected client and its loaded surface.
@@ -121,11 +134,30 @@ func (m model) updateBrowse(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cursor[m.section]++
 		}
 	case "enter", "right", "l":
-		if m.section == secTools && len(m.tools) > 0 {
-			return m.openForm(m.tools[m.cursor[secTools]]), nil
-		}
+		return m.open()
 	}
 	return m, nil
+}
+
+// open acts on the selected item: a tool opens its argument form, a resource is
+// read, and a prompt is rendered.
+func (m model) open() (tea.Model, tea.Cmd) {
+	if m.count(m.section) == 0 {
+		return m, nil
+	}
+	i := m.cursor[m.section]
+	switch m.section {
+	case secTools:
+		return m.openForm(m.tools[i]), nil
+	case secResources:
+		m.formTool = nil
+		r := m.resources[i]
+		return m.dispatch(r.URI, m.readResource(r.URI))
+	default:
+		m.formTool = nil
+		p := m.prompts[i]
+		return m.dispatch(p.Name, m.getPrompt(p.Name))
+	}
 }
 
 func (m model) count(s section) int {

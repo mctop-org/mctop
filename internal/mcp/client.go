@@ -120,6 +120,46 @@ func (c *Client) Call(ctx context.Context, name string, args map[string]any) (*s
 	return c.sess.CallTool(ctx, &sdk.CallToolParams{Name: name, Arguments: args})
 }
 
+// ReadResource fetches a resource's contents by URI.
+func (c *Client) ReadResource(ctx context.Context, uri string) (*sdk.ReadResourceResult, error) {
+	return c.sess.ReadResource(ctx, &sdk.ReadResourceParams{URI: uri})
+}
+
+// GetPrompt renders a prompt by name with the given arguments.
+func (c *Client) GetPrompt(ctx context.Context, name string, args map[string]string) (*sdk.GetPromptResult, error) {
+	return c.sess.GetPrompt(ctx, &sdk.GetPromptParams{Name: name, Arguments: args})
+}
+
+// RenderResource flattens a resource's contents to text, showing binary blobs
+// as a size note rather than dumping bytes.
+func RenderResource(r *sdk.ReadResourceResult) string {
+	var b strings.Builder
+	for i, c := range r.Contents {
+		if i > 0 {
+			b.WriteString("\n")
+		}
+		switch {
+		case c.Text != "":
+			b.WriteString(c.Text)
+		case len(c.Blob) > 0:
+			fmt.Fprintf(&b, "<%d bytes of %s>", len(c.Blob), c.MIMEType)
+		}
+	}
+	return b.String()
+}
+
+// RenderPrompt flattens a prompt's messages into readable role-tagged text.
+func RenderPrompt(r *sdk.GetPromptResult) string {
+	var b strings.Builder
+	for i, m := range r.Messages {
+		if i > 0 {
+			b.WriteString("\n\n")
+		}
+		fmt.Fprintf(&b, "[%s]\n%s", m.Role, RenderContent([]sdk.Content{m.Content}))
+	}
+	return b.String()
+}
+
 // RenderContent flattens a tool result's content blocks into readable text.
 // Text blocks pass through; other block types are shown as their JSON so nothing
 // is silently dropped.

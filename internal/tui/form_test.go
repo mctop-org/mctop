@@ -59,6 +59,22 @@ func TestCollectArgsCoercesTypes(t *testing.T) {
 	}
 }
 
+func TestEnterOnResourceOpensResult(t *testing.T) {
+	m := model{
+		resources: []*sdk.Resource{{URI: "file://readme"}},
+		section:   secResources,
+		width:     80,
+	}
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got := next.(model)
+	if got.screen != result || !got.running || got.resultTitle != "file://readme" {
+		t.Fatalf("resource enter: screen=%v running=%v title=%q", got.screen, got.running, got.resultTitle)
+	}
+	if cmd == nil || got.lastCmd == nil {
+		t.Fatal("resource enter should set a re-runnable command")
+	}
+}
+
 func TestResultMsgSwitchesToResult(t *testing.T) {
 	m := model{formTool: toolWithArgs(), screen: form, width: 80}
 	next, _ := m.Update(callResultMsg{output: "12:00", elapsed: "8ms"})

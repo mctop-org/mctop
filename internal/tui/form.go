@@ -60,8 +60,7 @@ func (m model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.screen = browse
 			return m, nil
 		case "enter":
-			m.running = true
-			return m, m.runCall()
+			return m.dispatch(m.formTool.Name, m.runCall())
 		case "tab", "down":
 			m.refocus(m.focus + 1)
 			return m, nil
@@ -110,6 +109,36 @@ func (m model) runCall() tea.Cmd {
 	}
 }
 
+func (m model) readResource(uri string) tea.Cmd {
+	client, parent := m.client, m.ctx
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(parent, callTimeout)
+		defer cancel()
+		start := time.Now()
+		res, err := client.ReadResource(ctx, uri)
+		elapsed := time.Since(start).Round(time.Millisecond).String()
+		if err != nil {
+			return callResultMsg{err: err, elapsed: elapsed}
+		}
+		return callResultMsg{output: mcp.RenderResource(res), elapsed: elapsed}
+	}
+}
+
+func (m model) getPrompt(name string) tea.Cmd {
+	client, parent := m.client, m.ctx
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(parent, callTimeout)
+		defer cancel()
+		start := time.Now()
+		res, err := client.GetPrompt(ctx, name, nil)
+		elapsed := time.Since(start).Round(time.Millisecond).String()
+		if err != nil {
+			return callResultMsg{err: err, elapsed: elapsed}
+		}
+		return callResultMsg{output: mcp.RenderPrompt(res), elapsed: elapsed}
+	}
+}
+
 // collectArgs reads the filled fields into call arguments, skipping blanks and
 // parsing each value as JSON so numbers and booleans are typed, falling back to
 // a string.
@@ -140,10 +169,14 @@ func (m model) updateResult(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.screen = browse
 	case "e":
-		m.screen = form
+		if m.formTool != nil {
+			m.screen = form
+		}
 	case "r":
-		m.running = true
-		return m, m.runCall()
+		if m.lastCmd != nil {
+			m.running = true
+			return m, m.lastCmd
+		}
 	}
 	return m, nil
 }
@@ -167,29 +200,32 @@ func (m model) viewForm() string {
 		}
 		b.WriteString(fmt.Sprintf("%s%s %s  %s\n", pointer, label, fi.input.View(), dim.Render(fi.arg.Type)))
 	}
-	run := "[ enter to run ]"
-	if m.running {
-		run = "running..."
-	}
-	b.WriteString("\n  " + accent.Render(run) + "\n")
+	b.WriteString("\n  " + accent.Render("[ enter to run ]") + "\n")
 	b.WriteString(m.rule() + "\n" + dim.Render("  ↑↓ field   enter run   esc back"))
 	return b.String()
 }
 
 func (m model) viewResult() string {
+	if m.running {
+		return m.header(m.resultTitle, dim.Render("running…")) + "\n\n" + dim.Render("  running...")
+	}
 	status := accent.Render("✓ ") + dim.Render(m.elapsed)
 	if m.resultErr != nil {
 		status = red.Render("✗ ") + dim.Render(m.elapsed)
 	}
 	var b strings.Builder
-	b.WriteString(m.header(m.formTool.Name+" → result", status) + "\n")
+	b.WriteString(m.header(m.resultTitle+" → result", status) + "\n")
 	if m.resultErr != nil {
 		b.WriteString(red.Render("  "+m.resultErr.Error()) + "\n")
 	}
 	if m.output != "" {
 		b.WriteString(indent(m.output) + "\n")
 	}
-	b.WriteString(m.rule() + "\n" + dim.Render("  r re-run   e edit args   esc back   q quit"))
+	keys := "  r re-run   esc back   q quit"
+	if m.formTool != nil {
+		keys = "  r re-run   e edit args   esc back   q quit"
+	}
+	b.WriteString(m.rule() + "\n" + dim.Render(keys))
 	return b.String()
 }
 
