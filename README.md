@@ -38,6 +38,28 @@ mctop test <spec.yaml>         run a contract, exit 0 on pass, 1 on fail
 A target is either a command to spawn (`"uvx mcp-server-time"`) or an
 `http(s)://` URL.
 
+For HTTP servers that need auth, pass headers with `-H` (repeatable):
+
+```
+mctop ls https://api.example.com/mcp -H "Authorization: Bearer $TOKEN"
+```
+
+In a test spec, headers live under the server and expand from the
+environment, so a token stays out of the committed file:
+
+```yaml
+server:
+  url: "https://api.example.com/mcp"
+  headers:
+    Authorization: "Bearer ${TOKEN}"
+expect:
+  tools: [search]
+```
+
+The `examples/` directory has runnable specs and a small demo server you can
+point mctop at (`go run ./examples/demoserver`, then `mctop ls
+http://localhost:8080/mcp`).
+
 ## License
 
 MIT.
