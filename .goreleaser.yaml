@@ -1,0 +1,51 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: mctop
+    main: .
+    binary: mctop
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+
+archives:
+  - id: mctop
+    name_template: "mctop_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+checksum:
+  name_template: "checksums.txt"
+
+homebrew_casks:
+  - name: mctop
+    repository:
+      owner: aloki-alok
+      name: homebrew-tap
+    homepage: "https://github.com/aloki-alok/mctop"
+    description: "A terminal client for MCP servers: explore, call, and CI-test any server."
+    license: "MIT"
+    # Strip the quarantine flag so the unsigned binary runs without a Gatekeeper prompt.
+    hooks:
+      post:
+        install: |
+          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/mctop"]
+          end
+
+release:
+  github:
+    owner: aloki-alok
+    name: mctop
+
+changelog:
+  use: github
