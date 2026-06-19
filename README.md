@@ -38,7 +38,17 @@ mctop test <spec.yaml>         run a contract, exit 0 on pass, 1 on fail
 A target is either a command to spawn (`"uvx mcp-server-time"`) or an
 `http(s)://` URL.
 
-For HTTP servers that need auth, pass headers with `-H` (repeatable):
+For OAuth-protected servers, log in once and mctop handles the token after that:
+
+```
+mctop login https://api.example.com/mcp   # opens the browser, caches the token
+mctop ls    https://api.example.com/mcp   # uses it automatically
+mctop logout https://api.example.com/mcp  # forgets it
+```
+
+The token is cached per host and refreshed as needed, so you log in once per
+server, not per command. For servers that take a static token instead, pass it
+with `-H` (repeatable):
 
 ```
 mctop ls https://api.example.com/mcp -H "Authorization: Bearer $TOKEN"
