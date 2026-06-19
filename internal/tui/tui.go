@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -16,8 +18,9 @@ import (
 	"github.com/aloki-alok/mctop/internal/mcp"
 )
 
-// chromeHeight is the number of lines the header and footer occupy, reserved
-// from the viewport that scrolls a result.
+// chromeHeight is the lines the header (2) and footer (2) occupy, reserved from
+// the body so panes fill the rest of the terminal and the footer pins to the
+// bottom.
 const chromeHeight = 4
 
 type section int
@@ -43,12 +46,26 @@ const (
 )
 
 var (
-	accent  = lipgloss.NewStyle().Foreground(lipgloss.Color("141"))
+	colAccent = lipgloss.Color("141") // iris
+	colBorder = lipgloss.Color("238") // hairline divider
+	colGreen  = lipgloss.Color("114")
+	colRed    = lipgloss.Color("203")
+
+	accent  = lipgloss.NewStyle().Foreground(colAccent)
 	bold    = lipgloss.NewStyle().Bold(true)
 	dim     = lipgloss.NewStyle().Faint(true)
-	cursorS = lipgloss.NewStyle().Foreground(lipgloss.Color("141")).Bold(true)
-	red     = lipgloss.NewStyle().Foreground(lipgloss.Color("203"))
+	cursorS = lipgloss.NewStyle().Foreground(colAccent).Bold(true)
+	red     = lipgloss.NewStyle().Foreground(colRed)
+	green   = lipgloss.NewStyle().Foreground(colGreen)
+	barS    = lipgloss.NewStyle().Foreground(colAccent)
 )
+
+func newSpinner() spinner.Model {
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = accent
+	return s
+}
 
 // model holds the connected session and the state of whichever screen is
 // active: the browse cursor, the open form, and the last result.
@@ -79,6 +96,7 @@ type model struct {
 	resultErr   error
 	elapsed     string
 	vp          viewport.Model
+	spin        spinner.Model
 }
 
 // dispatch starts an action (tool call, resource read, prompt render), showing
@@ -89,12 +107,13 @@ func (m model) dispatch(title string, cmd tea.Cmd) (tea.Model, tea.Cmd) {
 	m.resultTitle = title
 	m.lastCmd = cmd
 	m.screen = result
-	return m, cmd
+	// Run the action and animate the spinner alongside it.
+	return m, tea.Batch(cmd, m.spin.Tick)
 }
 
 // New builds the model from an already-connected client and its loaded surface.
 func New(ctx context.Context, server string, client *mcp.Client, tools []*sdk.Tool, resources []*sdk.Resource, prompts []*sdk.Prompt) tea.Model {
-	return model{ctx: ctx, server: server, client: client, tools: tools, resources: resources, prompts: prompts, vp: viewport.New(0, 0)}
+	return model{ctx: ctx, server: server, client: client, tools: tools, resources: resources, prompts: prompts, vp: viewport.New(0, 0), spin: newSpinner()}
 }
 
 func (m model) Init() tea.Cmd { return nil }
@@ -113,6 +132,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.vp.SetContent(m.resultBody())
 		m.vp.GotoTop()
 		return m, nil
+	case spinner.TickMsg:
+		// Keep the spinner turning only while an action is in flight.
+		if !m.running {
+			return m, nil
+		}
+		var cmd tea.Cmd
+		m.spin, cmd = m.spin.Update(msg)
+		return m, cmd
 	}
 
 	switch m.screen {
@@ -198,7 +225,7 @@ func (m model) open() (tea.Model, tea.Cmd) {
 	}
 	switch m.section {
 	case secTools:
-		return m.openForm(m.tools[i]), nil
+		return m.openForm(m.tools[i]), textinput.Blink
 	case secResources:
 		m.formTool = nil
 		r := m.resources[i]
@@ -245,8 +272,8 @@ func (m model) count(s section) int {
 }
 
 func (m model) View() string {
-	if m.width == 0 {
-		return "connecting..."
+	if m.width == 0 || m.height == 0 {
+		return ""
 	}
 	switch m.screen {
 	case form:
@@ -258,55 +285,130 @@ func (m model) View() string {
 	}
 }
 
+// bodyHeight is the rows between the header and footer.
+func (m model) bodyHeight() int {
+	if h := m.height - chromeHeight; h > 0 {
+		return h
+	}
+	return 1
+}
+
+// layout stacks the two-line header, the body, and the two-line footer so the
+// frame fills the terminal and the footer rests on the last row.
+func (m model) layout(header, body, footer string) string {
+	return header + "\n" + body + "\n" + footer
+}
+
 func (m model) viewBrowse() string {
-	body := lipgloss.JoinHorizontal(lipgloss.Top, m.leftPane(), m.rightPane())
-	return strings.Join([]string{m.headerView(), body, m.footerView()}, "\n")
+	bh := m.bodyHeight()
+	left := m.leftPane(bh)
+	right := m.rightPane(bh, lipgloss.Width(left))
+	body := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
+	return m.layout(m.headerView(), body, m.footerView())
 }
 
 func (m model) headerView() string {
-	return m.header(m.server, accent.Render("● ")+dim.Render("connected"))
+	return m.header(m.server, green.Render("●")+dim.Render(" connected"))
 }
 
 func (m model) header(title, right string) string {
-	left := accent.Render("mctop") + dim.Render(" · "+title)
+	left := "  " + accent.Bold(true).Render("mctop") + dim.Render("  ·  "+title)
+	return m.spread(left, right+"  ") + "\n" + m.rule()
+}
+
+// spread places left and right text on one row, filling the middle.
+func (m model) spread(left, right string) string {
 	gap := m.width - lipgloss.Width(left) - lipgloss.Width(right)
 	if gap < 1 {
 		gap = 1
 	}
-	return left + strings.Repeat(" ", gap) + right + "\n" + dim.Render(strings.Repeat("─", m.width))
+	return left + strings.Repeat(" ", gap) + right
 }
 
 func (m model) rule() string { return dim.Render(strings.Repeat("─", m.width)) }
 
-func (m model) leftPane() string {
-	var b strings.Builder
-	for s := secTools; s <= secPrompts; s++ {
-		label := fmt.Sprintf("%s (%d)", strings.ToUpper(s.String()), m.count(s))
-		if s == m.section {
-			b.WriteString(accent.Render(label) + "\n")
-			if m.searching || m.query != "" {
-				b.WriteString(dim.Render("  /"+m.query) + "\n")
-			}
-			b.WriteString(m.itemList())
-		} else {
-			b.WriteString(dim.Render(label) + "\n")
-		}
+func (m model) leftWidth() int {
+	w := m.width / 3
+	switch {
+	case w < 22:
+		w = 22
+	case w > 36:
+		w = 36
 	}
-	return lipgloss.NewStyle().Width(34).Render(b.String())
+	if w > m.width-12 {
+		w = m.width - 12
+	}
+	if w < 8 {
+		w = 8
+	}
+	return w
 }
 
-func (m model) itemList() string {
-	var b strings.Builder
-	for pos, i := range m.visibleItems() {
-		prefix := "  "
-		label := m.itemLabel(m.section, i)
-		if pos == m.cursor {
-			prefix = cursorS.Render("▸ ")
-			label = bold.Render(label)
-		}
-		b.WriteString(prefix + label + "\n")
+// leftPane is the section list, bounded to the body height with a hairline
+// divider on its right edge.
+func (m model) leftPane(height int) string {
+	return lipgloss.NewStyle().
+		Width(m.leftWidth()).
+		Height(height).
+		MaxHeight(height).
+		Padding(0, 2, 0, 1).
+		Border(lipgloss.NormalBorder(), false, true, false, false).
+		BorderForeground(colBorder).
+		Render(m.sectionList(height))
+}
+
+// sectionList renders the three section headers and, under the active one, a
+// window of its items sized to fit the available rows.
+func (m model) sectionList(height int) string {
+	reserved := 3 // one line per section header
+	if m.searching || m.query != "" {
+		reserved++
 	}
-	return b.String()
+	itemRows := height - reserved
+	if itemRows < 1 {
+		itemRows = 1
+	}
+
+	var lines []string
+	for s := secTools; s <= secPrompts; s++ {
+		lines = append(lines, sectionHeader(s, m.count(s), s == m.section))
+		if s != m.section {
+			continue
+		}
+		if m.searching || m.query != "" {
+			lines = append(lines, accent.Render("/"+m.query)+dim.Render("▏"))
+		}
+		lines = append(lines, m.itemRows(itemRows)...)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func sectionHeader(s section, count int, active bool) string {
+	name := strings.ToUpper(s.String())
+	cnt := dim.Render(fmt.Sprintf(" (%d)", count))
+	if active {
+		return accent.Bold(true).Render(name) + cnt
+	}
+	return dim.Render(name) + cnt
+}
+
+func (m model) itemRows(maxRows int) []string {
+	vis := m.visibleItems()
+	if len(vis) == 0 {
+		return []string{dim.Render("  no matches")}
+	}
+	slice, top := windowItems(vis, m.cursor, maxRows)
+	labelW := m.leftWidth() - 2
+	rows := make([]string, 0, len(slice))
+	for off, idx := range slice {
+		label := truncate(m.itemLabel(m.section, idx), labelW)
+		if top+off == m.cursor {
+			rows = append(rows, barS.Render("▌")+" "+accent.Bold(true).Render(label))
+		} else {
+			rows = append(rows, "  "+label)
+		}
+	}
+	return rows
 }
 
 func (m model) itemLabel(s section, i int) string {
@@ -320,17 +422,18 @@ func (m model) itemLabel(s section, i int) string {
 	}
 }
 
-func (m model) rightPane() string {
-	width := m.width - 36
-	if width < 10 {
-		width = 10
+// rightPane shows the selected item's details, bounded to the body height and
+// wrapped to the remaining width.
+func (m model) rightPane(height, leftWidth int) string {
+	w := m.width - leftWidth - 3
+	if w < 8 {
+		w = 8
 	}
-	style := lipgloss.NewStyle().Width(width).PaddingLeft(2)
-	i := m.selected()
-	if i < 0 {
-		return style.Render(dim.Render("nothing here"))
+	content := dim.Render("nothing selected")
+	if i := m.selected(); i >= 0 {
+		content = m.detail(m.section, i)
 	}
-	return style.Render(m.detail(m.section, i))
+	return lipgloss.NewStyle().Width(w).Height(height).MaxHeight(height).Padding(1, 3).Render(content)
 }
 
 func (m model) detail(s section, i int) string {
@@ -339,36 +442,82 @@ func (m model) detail(s section, i int) string {
 		return m.toolDetail(m.tools[i])
 	case secResources:
 		r := m.resources[i]
-		return bold.Render(r.URI) + "\n" + dim.Render(r.MIMEType) + "\n\n" + r.Description
+		head := bold.Render(r.URI)
+		if r.MIMEType != "" {
+			head += "\n" + dim.Render(r.MIMEType)
+		}
+		return head + "\n\n" + r.Description + "\n\n" + dim.Render("enter") + dim.Render(" to read")
 	default:
 		p := m.prompts[i]
-		return bold.Render(p.Name) + "\n\n" + p.Description
+		return bold.Render(p.Name) + "\n\n" + p.Description + "\n\n" + accent.Render("enter") + dim.Render(" to render")
 	}
 }
 
 func (m model) toolDetail(t *sdk.Tool) string {
 	var b strings.Builder
-	b.WriteString(bold.Render(t.Name) + "\n")
+	b.WriteString(accent.Bold(true).Render(t.Name))
 	if t.Description != "" {
-		b.WriteString(t.Description + "\n")
+		b.WriteString("\n\n" + t.Description)
 	}
-	args := toolArgs(t)
-	if len(args) > 0 {
-		b.WriteString("\n" + accent.Render("arguments") + "\n")
+	if args := toolArgs(t); len(args) > 0 {
+		b.WriteString("\n\n" + dim.Render("ARGUMENTS"))
 		for _, a := range args {
-			name := a.Name
+			name := bold.Render(a.Name)
 			if a.Required {
-				name += "*"
+				name += accent.Render("*")
 			}
-			b.WriteString(fmt.Sprintf("  %-16s %s  %s\n", bold.Render(name), dim.Render(a.Type), dim.Render(a.Desc)))
+			b.WriteString("\n\n" + name + "  " + dim.Render(a.Type))
+			if a.Desc != "" {
+				b.WriteString("\n" + dim.Render(a.Desc))
+			}
 		}
 	}
+	b.WriteString("\n\n" + accent.Render("enter") + dim.Render(" to call"))
 	return b.String()
 }
 
 func (m model) footerView() string {
+	left := "  " + dim.Render("↑↓ move   enter open   / search   tab section   q quit")
 	if m.searching {
-		return m.rule() + "\n" + accent.Render("  /"+m.query) + dim.Render("   enter open   esc cancel")
+		left = "  " + accent.Render("/"+m.query) + dim.Render("   enter open   esc cancel")
 	}
-	return m.rule() + "\n" + dim.Render("  ↑↓ move   enter open   / search   tab section   q quit")
+	right := ""
+	if n := len(m.visibleItems()); n > 0 {
+		right = dim.Render(fmt.Sprintf("%d/%d  ", m.cursor+1, n))
+	}
+	return m.rule() + "\n" + m.spread(left, right)
+}
+
+// windowItems returns the slice of items visible around the cursor and the index
+// it starts at, so a long list scrolls to keep the cursor on screen.
+func windowItems(vis []int, cursor, rows int) (slice []int, top int) {
+	if rows <= 0 || len(vis) == 0 {
+		return nil, 0
+	}
+	if len(vis) <= rows {
+		return vis, 0
+	}
+	top = cursor - rows/2
+	if top < 0 {
+		top = 0
+	}
+	if top+rows > len(vis) {
+		top = len(vis) - rows
+	}
+	return vis[top : top+rows], top
+}
+
+// truncate shortens s to w columns with an ellipsis, so list rows never wrap.
+func truncate(s string, w int) string {
+	if w <= 0 {
+		return ""
+	}
+	r := []rune(s)
+	if len(r) <= w {
+		return s
+	}
+	if w == 1 {
+		return "…"
+	}
+	return string(r[:w-1]) + "…"
 }

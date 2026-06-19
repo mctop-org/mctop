@@ -9,6 +9,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/aloki-alok/mctop/internal/mcp"
@@ -188,26 +189,39 @@ func (m model) updateResult(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) viewForm() string {
-	var b strings.Builder
-	b.WriteString(m.header(m.formTool.Name, dim.Render("call")) + "\n")
+	bh := m.bodyHeight()
+	body := lipgloss.NewStyle().Height(bh).MaxHeight(bh).Padding(1, 3).Render(m.formBody())
+	footer := m.rule() + "\n" + dim.Render("  ↑↓ field   enter run   esc back")
+	return m.layout(m.header(m.formTool.Name, dim.Render("fill arguments")), body, footer)
+}
+
+func (m model) formBody() string {
 	if len(m.inputs) == 0 {
-		b.WriteString("\n" + dim.Render("  no arguments") + "\n")
+		return dim.Render("this tool takes no arguments") + "\n\n" + accent.Render("enter") + dim.Render(" to run")
 	}
+	var b strings.Builder
 	for i, fi := range m.inputs {
-		name := fi.arg.Name
-		if fi.arg.Required {
-			name += "*"
-		}
 		pointer := "  "
-		label := fmt.Sprintf("%-16s", name)
 		if i == m.focus {
-			pointer = cursorS.Render("▸ ")
-			label = bold.Render(label)
+			pointer = barS.Render("▌") + " "
 		}
-		b.WriteString(fmt.Sprintf("%s%s %s  %s\n", pointer, label, fi.input.View(), dim.Render(fi.arg.Type)))
+		plain := fi.arg.Name
+		styled := bold.Render(fi.arg.Name)
+		if fi.arg.Required {
+			plain += "*"
+			styled += accent.Render("*")
+		}
+		pad := 16 - len([]rune(plain))
+		if pad < 1 {
+			pad = 1
+		}
+		b.WriteString(pointer + styled + strings.Repeat(" ", pad) + fi.input.View())
+		if fi.arg.Type != "" {
+			b.WriteString("  " + dim.Render(fi.arg.Type))
+		}
+		b.WriteString("\n\n")
 	}
-	b.WriteString("\n  " + accent.Render("[ enter to run ]") + "\n")
-	b.WriteString(m.rule() + "\n" + dim.Render("  ↑↓ field   enter run   esc back"))
+	b.WriteString(accent.Render("enter") + dim.Render(" to run"))
 	return b.String()
 }
 
@@ -226,10 +240,13 @@ func (m model) resultBody() string {
 }
 
 func (m model) viewResult() string {
+	bh := m.bodyHeight()
 	if m.running {
-		return m.header(m.resultTitle, dim.Render("running…")) + "\n\n" + dim.Render("  running...")
+		body := lipgloss.NewStyle().Height(bh).MaxHeight(bh).Padding(1, 3).Render(m.spin.View() + dim.Render("running"))
+		footer := m.rule() + "\n" + dim.Render("  esc cancel")
+		return m.layout(m.header(m.resultTitle, dim.Render("calling")), body, footer)
 	}
-	status := accent.Render("✓ ") + dim.Render(m.elapsed)
+	status := green.Render("✓ ") + dim.Render(m.elapsed)
 	if m.resultErr != nil {
 		status = red.Render("✗ ") + dim.Render(m.elapsed)
 	}
@@ -237,10 +254,12 @@ func (m model) viewResult() string {
 	if m.formTool != nil {
 		keys = "  r re-run   e edit args   esc back   q quit"
 	}
+	pct := ""
 	if m.vp.TotalLineCount() > m.vp.Height {
-		keys = dim.Render(fmt.Sprintf("  %d%%  ", int(m.vp.ScrollPercent()*100))) + keys
+		pct = dim.Render(fmt.Sprintf("%d%%  ", int(m.vp.ScrollPercent()*100)))
 	}
-	return m.header(m.resultTitle+" → result", status) + "\n" + m.vp.View() + "\n" + m.rule() + "\n" + dim.Render(keys)
+	footer := m.rule() + "\n" + m.spread(dim.Render(keys), pct)
+	return m.layout(m.header(m.resultTitle+" → result", status), m.vp.View(), footer)
 }
 
 func indent(s string) string {
