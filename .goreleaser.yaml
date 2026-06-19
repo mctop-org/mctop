@@ -31,6 +31,7 @@ homebrew_casks:
     repository:
       owner: aloki-alok
       name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: "https://github.com/aloki-alok/mctop"
     description: "A terminal client for MCP servers: explore, call, and CI-test any server."
     license: "MIT"
