@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os/exec"
 	"runtime"
+	"time"
 )
 
 // awaitCode serves the one redirect the authorization server makes back to us:
@@ -39,7 +40,6 @@ func awaitCode(ctx context.Context, listener net.Listener, state, authURL string
 		done <- result{code: q.Get("code")}
 	})}
 	go srv.Serve(listener)
-	defer srv.Close()
 
 	fmt.Println("Opening your browser to log in. If it does not open, visit:")
 	fmt.Println("  " + authURL)
@@ -47,8 +47,14 @@ func awaitCode(ctx context.Context, listener net.Listener, state, authURL string
 
 	select {
 	case <-ctx.Done():
+		srv.Close()
 		return "", ctx.Err()
 	case res := <-done:
+		// Shut down gracefully so the success page finishes sending before the
+		// process exits, rather than the browser seeing a dropped connection.
+		shutCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = srv.Shutdown(shutCtx)
 		return res.code, res.err
 	}
 }
@@ -56,6 +62,9 @@ func awaitCode(ctx context.Context, listener net.Listener, state, authURL string
 func finish(w http.ResponseWriter, msg string) {
 	w.Header().Set("Content-Type", "text/html")
 	fmt.Fprintf(w, "<!doctype html><title>mctop</title><body style=\"font-family:system-ui;padding:3rem\"><p>%s</p>", msg)
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
 }
 
 // openBrowser tries to open url in the default browser, ignoring failure since
