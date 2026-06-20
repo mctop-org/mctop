@@ -88,6 +88,20 @@ func (c *Client) Server() (name, version string) {
 	return "", ""
 }
 
+// HasResources reports whether the server advertised the resources capability.
+// Calling resources/list on a server that lacks it can error and, over HTTP,
+// tear down the session, so callers gate on this.
+func (c *Client) HasResources() bool {
+	r := c.sess.InitializeResult()
+	return r != nil && r.Capabilities != nil && r.Capabilities.Resources != nil
+}
+
+// HasPrompts reports whether the server advertised the prompts capability.
+func (c *Client) HasPrompts() bool {
+	r := c.sess.InitializeResult()
+	return r != nil && r.Capabilities != nil && r.Capabilities.Prompts != nil
+}
+
 // Tools lists the server's tools.
 func (c *Client) Tools(ctx context.Context) ([]*sdk.Tool, error) {
 	res, err := c.sess.ListTools(ctx, nil)

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/aloki-alok/mctop/internal/mcp"
 	"github.com/aloki-alok/mctop/internal/tui"
@@ -26,13 +27,12 @@ func TUI(args []string) int {
 	}
 	target := strings.Join(rest, " ")
 
-	// ctx lives for the whole session; the connect step gets its own deadline.
+	// ctx lives for the whole session and owns the client connection, so it must
+	// not be cancelled until the program exits.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	connectCtx, connectCancel := context.WithTimeout(ctx, dialTimeout)
-	client, err := mcp.Connect(connectCtx, target, mcp.Options{Headers: withAuth(connectCtx, target, headers)})
-	connectCancel()
+	client, err := mcp.Connect(ctx, target, mcp.Options{Headers: withAuth(ctx, target, headers)})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "mctop:", err)
 		hintLogin(target, err)
@@ -40,12 +40,18 @@ func TUI(args []string) int {
 	}
 	defer client.Close()
 
-	// Resources and prompts are optional capabilities, so their errors are not
-	// fatal: a server may expose only tools.
+	// Only request resources and prompts when the server advertises them: asking
+	// a server that does not can return an error that closes the session.
 	loadCtx, loadCancel := context.WithTimeout(ctx, dialTimeout)
 	tools, err := client.Tools(loadCtx)
-	resources, _ := client.Resources(loadCtx)
-	prompts, _ := client.Prompts(loadCtx)
+	var resources []*sdk.Resource
+	var prompts []*sdk.Prompt
+	if client.HasResources() {
+		resources, _ = client.Resources(loadCtx)
+	}
+	if client.HasPrompts() {
+		prompts, _ = client.Prompts(loadCtx)
+	}
 	loadCancel()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "mctop: list tools:", err)

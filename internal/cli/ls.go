@@ -50,20 +50,26 @@ func LS(args []string) int {
 	}
 	printSection(s, "tools", rows)
 
-	if resources, err := client.Resources(ctx); err == nil && len(resources) > 0 {
-		rows := make([][2]string, len(resources))
-		for i, r := range resources {
-			rows[i] = [2]string{r.URI, firstLine(r.Description)}
+	// Only request resources and prompts when advertised: asking a server that
+	// lacks them can error and close the session.
+	if client.HasResources() {
+		if resources, err := client.Resources(ctx); err == nil && len(resources) > 0 {
+			rows := make([][2]string, len(resources))
+			for i, r := range resources {
+				rows[i] = [2]string{r.URI, firstLine(r.Description)}
+			}
+			printSection(s, "resources", rows)
 		}
-		printSection(s, "resources", rows)
 	}
 
-	if prompts, err := client.Prompts(ctx); err == nil && len(prompts) > 0 {
-		rows := make([][2]string, len(prompts))
-		for i, p := range prompts {
-			rows[i] = [2]string{p.Name, firstLine(p.Description)}
+	if client.HasPrompts() {
+		if prompts, err := client.Prompts(ctx); err == nil && len(prompts) > 0 {
+			rows := make([][2]string, len(prompts))
+			for i, p := range prompts {
+				rows[i] = [2]string{p.Name, firstLine(p.Description)}
+			}
+			printSection(s, "prompts", rows)
 		}
-		printSection(s, "prompts", rows)
 	}
 
 	return 0
