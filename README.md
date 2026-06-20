@@ -65,8 +65,9 @@ schema-driven form and run it; read the result, then go again.
 ↑↓ move    enter open    / search    tab switch section    ? keys    q quit
 ```
 
-Results are shown as indented, colored JSON; press `t` to switch to the raw
-payload and back, and `y` to copy it to the clipboard. `r` re-runs, `e` edits the
+Results are laid out to fit the screen: a list of objects becomes a table, a
+flat object an aligned key/value block, and nested data colored, indented JSON.
+Press `t` for the raw payload, `y` to copy it. `r` re-runs, `e` edits the
 arguments, `esc` (or `←`) goes back.
 
 Vim motions (`h`/`j`/`k`/`l`, `g`/`G`) are on by default; `V` toggles them and the

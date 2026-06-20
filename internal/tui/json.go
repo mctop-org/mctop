@@ -3,8 +3,11 @@ package tui
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"regexp"
+	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -18,11 +21,403 @@ var (
 	reNum = regexp.MustCompile(`-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?`)
 )
 
-// prettyJSON indents a JSON payload and lightly colors keys, strings, numbers,
-// and literals so a result is readable instead of a single dense line. It
-// returns ok=false when the input is not valid JSON, so callers fall back to the
-// raw text untouched.
-func prettyJSON(raw string) (string, bool) {
+// prettyJSON lays a JSON result out to use the horizontal space: an array of
+// objects becomes a table, a flat object becomes an aligned key/value block, and
+// anything nested falls back to indented, colored JSON. It returns ok=false when
+// the input is not valid JSON so callers keep the raw text.
+func prettyJSON(raw string, width int) (string, bool) {
+	v, err := decodeOrdered(raw)
+	if err != nil {
+		return "", false
+	}
+	switch x := v.(type) {
+	case []any:
+		if t, ok := renderTable(x, width); ok {
+			return t, true
+		}
+	case *object:
+		if t, ok := renderFlatObject(x, width); ok {
+			return t, true
+		}
+	}
+	return indentJSON(raw)
+}
+
+// object is a JSON object that remembers its key order, which json.Unmarshal into
+// a map would lose. Column and row order follow the original payload.
+type object struct {
+	keys []string
+	vals map[string]any
+}
+
+// decodeOrdered parses one JSON value, preserving object key order. Scalars come
+// back as string, json.Number, bool, or nil; objects as *object; arrays as []any.
+func decodeOrdered(raw string) (any, error) {
+	dec := json.NewDecoder(strings.NewReader(raw))
+	dec.UseNumber()
+	v, err := readValue(dec)
+	if err != nil {
+		return nil, err
+	}
+	if dec.More() {
+		return nil, errors.New("trailing data after JSON value")
+	}
+	return v, nil
+}
+
+func readValue(dec *json.Decoder) (any, error) {
+	t, err := dec.Token()
+	if err != nil {
+		return nil, err
+	}
+	delim, ok := t.(json.Delim)
+	if !ok {
+		return t, nil // string, json.Number, bool, or nil
+	}
+	switch delim {
+	case '{':
+		o := &object{vals: map[string]any{}}
+		for dec.More() {
+			kt, err := dec.Token()
+			if err != nil {
+				return nil, err
+			}
+			key := kt.(string)
+			val, err := readValue(dec)
+			if err != nil {
+				return nil, err
+			}
+			o.keys = append(o.keys, key)
+			o.vals[key] = val
+		}
+		_, err = dec.Token() // closing }
+		return o, err
+	case '[':
+		var arr []any
+		for dec.More() {
+			val, err := readValue(dec)
+			if err != nil {
+				return nil, err
+			}
+			arr = append(arr, val)
+		}
+		_, err = dec.Token() // closing ]
+		return arr, err
+	}
+	return t, nil
+}
+
+// cell kinds drive both alignment and color.
+const (
+	kEmpty = iota
+	kStr
+	kNum
+	kLit
+	kNested
+)
+
+type cell struct {
+	text string
+	kind int
+}
+
+func toCell(v any, present bool) cell {
+	if !present {
+		return cell{"", kEmpty}
+	}
+	switch x := v.(type) {
+	case nil:
+		return cell{"null", kLit}
+	case bool:
+		return cell{strconv.FormatBool(x), kLit}
+	case json.Number:
+		return cell{x.String(), kNum}
+	case string:
+		return cell{x, kStr}
+	default:
+		return cell{compact(v), kNested}
+	}
+}
+
+func styleCell(text string, kind int) string {
+	switch kind {
+	case kNum:
+		return jNum.Render(text)
+	case kLit:
+		return jLit.Render(text)
+	case kStr:
+		return green.Render(text)
+	case kNested:
+		return dim.Render(text)
+	default:
+		return text
+	}
+}
+
+// renderTable lays an array of objects out as columns. It declines (ok=false)
+// when the array is empty, holds non-objects, or cannot be made to fit, so the
+// caller falls back to indented JSON.
+func renderTable(arr []any, width int) (string, bool) {
+	if len(arr) == 0 {
+		return "", false
+	}
+	rows := make([]*object, len(arr))
+	for i, el := range arr {
+		o, ok := el.(*object)
+		if !ok {
+			return "", false
+		}
+		rows[i] = o
+	}
+
+	cols := orderedColumns(rows)
+	if len(cols) == 0 {
+		return "", false
+	}
+	headers := append([]string{"#"}, cols...)
+
+	grid := make([][]cell, len(rows))
+	for i, o := range rows {
+		line := make([]cell, len(headers))
+		line[0] = cell{strconv.Itoa(i + 1), kNum}
+		for j, c := range cols {
+			v, present := o.vals[c]
+			line[j+1] = toCell(v, present)
+		}
+		grid[i] = line
+	}
+
+	numeric := make([]bool, len(headers))
+	colW := make([]int, len(headers))
+	for j, h := range headers {
+		colW[j] = cellWidth(h)
+		num, hasVal := true, false
+		for i := range grid {
+			cl := grid[i][j]
+			if cl.kind != kEmpty {
+				hasVal = true
+				if cl.kind != kNum {
+					num = false
+				}
+			}
+			if w := cellWidth(cl.text); w > colW[j] {
+				colW[j] = w
+			}
+		}
+		numeric[j] = num && hasVal
+	}
+	numeric[0] = true // the index column
+
+	if !fitColumns(colW, width) {
+		return "", false
+	}
+
+	var b strings.Builder
+	b.WriteString(renderHeader(headers, colW, numeric))
+	b.WriteString("\n")
+	b.WriteString(dim.Render(strings.Repeat("─", rowWidth(colW))))
+	b.WriteString("\n")
+	for i := range rows {
+		texts := make([]string, len(headers))
+		kinds := make([]int, len(headers))
+		for j := range headers {
+			texts[j] = grid[i][j].text
+			kinds[j] = grid[i][j].kind
+		}
+		// the index column reads as a quiet gutter, not data
+		kinds[0] = kEmpty
+		b.WriteString(renderRowCells(texts, kinds, colW, numeric))
+		if i < len(rows)-1 {
+			b.WriteString("\n")
+		}
+	}
+	return b.String(), true
+}
+
+// orderedColumns is the union of the rows' keys in first-seen order.
+func orderedColumns(rows []*object) []string {
+	var cols []string
+	seen := map[string]bool{}
+	for _, o := range rows {
+		for _, k := range o.keys {
+			if !seen[k] {
+				seen[k] = true
+				cols = append(cols, k)
+			}
+		}
+	}
+	return cols
+}
+
+// fitColumns shrinks the widest columns (capping any single column at 40) until
+// the row fits the width, truncating cells later. It returns false if the row
+// cannot fit even with every column at the minimum.
+func fitColumns(colW []int, width int) bool {
+	const cap, min = 40, 3
+	for i := range colW {
+		if colW[i] > cap {
+			colW[i] = cap
+		}
+	}
+	for rowWidth(colW) > width {
+		widest := -1
+		for i := range colW {
+			if colW[i] > min && (widest == -1 || colW[i] > colW[widest]) {
+				widest = i
+			}
+		}
+		if widest == -1 {
+			return false
+		}
+		colW[widest]--
+	}
+	return true
+}
+
+func rowWidth(colW []int) int {
+	total := 0
+	for _, w := range colW {
+		total += w
+	}
+	return total + 2*(len(colW)-1)
+}
+
+func renderRowCells(texts []string, kinds []int, colW []int, numeric []bool) string {
+	cells := make([]string, len(texts))
+	for j := range texts {
+		t := ellipsize(texts[j], colW[j])
+		if numeric[j] {
+			t = padLeft(t, colW[j])
+		} else {
+			t = padRight(t, colW[j])
+		}
+		cells[j] = styleCell(t, kinds[j])
+	}
+	return strings.Join(cells, "  ")
+}
+
+// renderHeader styles the column titles in one accent style, aligned the same
+// way as their data cells.
+func renderHeader(texts []string, colW []int, numeric []bool) string {
+	cells := make([]string, len(texts))
+	for j := range texts {
+		t := ellipsize(texts[j], colW[j])
+		if numeric[j] {
+			t = padLeft(t, colW[j])
+		} else {
+			t = padRight(t, colW[j])
+		}
+		cells[j] = accent.Render(t)
+	}
+	return strings.Join(cells, "  ")
+}
+
+// renderFlatObject lays an object of scalar values out as an aligned key/value
+// block. It declines when any value is nested or the pane is too narrow.
+func renderFlatObject(o *object, width int) (string, bool) {
+	if len(o.keys) == 0 {
+		return "", false
+	}
+	keyW := 0
+	for _, k := range o.keys {
+		if _, _, nested := scalar(o.vals[k]); nested {
+			return "", false
+		}
+		if w := cellWidth(k); w > keyW {
+			keyW = w
+		}
+	}
+	if keyW > 28 {
+		keyW = 28
+	}
+	valW := width - keyW - 2
+	if valW < 8 {
+		return "", false
+	}
+
+	var b strings.Builder
+	for _, k := range o.keys {
+		text, kind, _ := scalar(o.vals[k])
+		lines := strings.Split(wrapPlain(text, valW), "\n")
+		for li, ln := range lines {
+			if li == 0 {
+				b.WriteString(accent.Render(ellipsize(k, keyW)) + strings.Repeat(" ", keyW-min(cellWidth(k), keyW)+2))
+			} else {
+				b.WriteString(strings.Repeat(" ", keyW+2))
+			}
+			b.WriteString(styleCell(ln, kind))
+			b.WriteString("\n")
+		}
+	}
+	return strings.TrimRight(b.String(), "\n"), true
+}
+
+// scalar renders a scalar value to text with its kind, reporting nested=true for
+// objects and arrays so callers can decline a flat layout.
+func scalar(v any) (text string, kind int, nested bool) {
+	c := toCell(v, true)
+	return c.text, c.kind, c.kind == kNested
+}
+
+// compact renders any decoded value back to minified JSON for a table cell that
+// holds nested data.
+func compact(v any) string {
+	switch x := v.(type) {
+	case *object:
+		parts := make([]string, len(x.keys))
+		for i, k := range x.keys {
+			parts[i] = strconv.Quote(k) + ":" + compact(x.vals[k])
+		}
+		return "{" + strings.Join(parts, ",") + "}"
+	case []any:
+		parts := make([]string, len(x))
+		for i, e := range x {
+			parts[i] = compact(e)
+		}
+		return "[" + strings.Join(parts, ",") + "]"
+	case nil:
+		return "null"
+	case bool:
+		return strconv.FormatBool(x)
+	case json.Number:
+		return x.String()
+	case string:
+		return strconv.Quote(x)
+	default:
+		return ""
+	}
+}
+
+func cellWidth(s string) int { return utf8.RuneCountInString(s) }
+
+func padRight(s string, w int) string {
+	if d := w - cellWidth(s); d > 0 {
+		return s + strings.Repeat(" ", d)
+	}
+	return s
+}
+
+func padLeft(s string, w int) string {
+	if d := w - cellWidth(s); d > 0 {
+		return strings.Repeat(" ", d) + s
+	}
+	return s
+}
+
+func ellipsize(s string, w int) string {
+	if cellWidth(s) <= w {
+		return s
+	}
+	r := []rune(s)
+	if w <= 1 {
+		return string(r[:max(0, w)])
+	}
+	return string(r[:w-1]) + "…"
+}
+
+// indentJSON indents a JSON payload and lightly colors keys, strings, numbers,
+// and literals: the fallback for nested data that no flat layout fits.
+func indentJSON(raw string) (string, bool) {
 	var buf bytes.Buffer
 	if err := json.Indent(&buf, []byte(raw), "", "  "); err != nil {
 		return "", false

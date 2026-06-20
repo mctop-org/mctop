@@ -286,7 +286,7 @@ func (m model) resultBody() string {
 // non-JSON output, so nothing is clipped off the right edge.
 func (m model) renderOutput() string {
 	if !m.rawView {
-		if pretty, ok := prettyJSON(m.output); ok {
+		if pretty, ok := prettyJSON(m.output, m.vp.Width-2); ok {
 			return pretty
 		}
 	}
