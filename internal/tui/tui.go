@@ -452,7 +452,10 @@ func sectionHeader(s section, count int, active bool) string {
 func (m model) itemRows(maxRows int) []string {
 	vis := m.visibleItems()
 	if len(vis) == 0 {
-		return []string{dim.Render("  no matches")}
+		if m.query != "" {
+			return []string{dim.Render("  no matches")}
+		}
+		return []string{dim.Render("  none")}
 	}
 	slice, top := windowItems(vis, m.cursor, maxRows)
 	labelW := m.leftWidth() - 2
@@ -486,11 +489,24 @@ func (m model) rightPane(height, leftWidth int) string {
 	if w < 8 {
 		w = 8
 	}
-	content := dim.Render("nothing selected")
+	content := m.sectionHelp()
 	if i := m.selected(); i >= 0 {
 		content = m.detail(m.section, i)
 	}
 	return lipgloss.NewStyle().Width(w).Height(height).MaxHeight(height).Padding(1, 3).Render(content)
+}
+
+// sectionHelp explains the active section when it has nothing selected, so an
+// empty Resources or Prompts pane says what it is instead of looking broken.
+func (m model) sectionHelp() string {
+	switch m.section {
+	case secTools:
+		return bold.Render("Tools") + "\n\n" + dim.Render("Functions the server can run for you. This one exposes none.")
+	case secResources:
+		return bold.Render("Resources") + "\n\n" + dim.Render("Readable data the server exposes (files, records, documents) that an agent can pull in as context. This server exposes none.")
+	default:
+		return bold.Render("Prompts") + "\n\n" + dim.Render("Prepared prompt templates the server offers; open one to render it. This server exposes none.")
+	}
 }
 
 func (m model) detail(s section, i int) string {
