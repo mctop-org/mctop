@@ -90,7 +90,7 @@ func humanArray(arr []any, width, depth int) string {
 		}
 	}
 	if allObjects {
-		if t, ok := renderTable(arr, width); ok {
+		if t, ok := renderTable(arr, width, -1); ok {
 			return t
 		}
 		blocks := make([]string, len(arr))

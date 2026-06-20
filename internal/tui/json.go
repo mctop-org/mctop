@@ -133,21 +133,40 @@ func styleCell(text string, kind int) string {
 	}
 }
 
-// renderTable lays an array of objects out as columns. It declines (ok=false)
-// when the array is empty, holds non-objects, or cannot be made to fit, so the
-// caller falls back to indented JSON.
-func renderTable(arr []any, width int) (string, bool) {
-	if len(arr) == 0 {
-		return "", false
+// asObjectRows returns the records of an array whose every element is an object,
+// or nil when the value is not such an array. It is what makes a result
+// row-navigable on the result screen.
+func asObjectRows(v any) []*object {
+	arr, ok := v.([]any)
+	if !ok || len(arr) == 0 {
+		return nil
 	}
 	rows := make([]*object, len(arr))
 	for i, el := range arr {
 		o, ok := el.(*object)
 		if !ok {
-			return "", false
+			return nil
 		}
 		rows[i] = o
 	}
+	return rows
+}
+
+// renderTable lays an array of objects out as columns. It declines (ok=false)
+// when the array is empty, holds non-objects, or cannot be made to fit, so the
+// caller falls back to indented JSON.
+func renderTable(arr []any, width, selected int) (string, bool) {
+	rows := asObjectRows(arr)
+	if rows == nil {
+		return "", false
+	}
+	return renderObjectTable(rows, width, selected)
+}
+
+// renderObjectTable draws the records as a table. When selected is non-negative
+// it adds a left marker gutter and points the accent bar at that row, which is
+// how the result screen highlights the row under the cursor.
+func renderObjectTable(rows []*object, width, selected int) (string, bool) {
 	const maxTableRows = 1000
 	extra := 0
 	if len(rows) > maxTableRows {
@@ -193,14 +212,29 @@ func renderTable(arr []any, width int) (string, bool) {
 	}
 	numeric[0] = true // the index column
 
-	if !fitColumns(colW, width) {
+	// Reserve a left gutter for the selection marker when a row is highlighted.
+	markerW := 0
+	if selected >= 0 {
+		markerW = 2
+	}
+	if !fitColumns(colW, width-markerW) {
 		return "", false
+	}
+	gutter := strings.Repeat(" ", markerW)
+	mark := func(i int) string {
+		if selected < 0 {
+			return ""
+		}
+		if i == selected {
+			return barS.Render("▌") + " "
+		}
+		return "  "
 	}
 
 	var b strings.Builder
-	b.WriteString(renderHeader(headers, colW, numeric))
+	b.WriteString(gutter + renderHeader(headers, colW, numeric))
 	b.WriteString("\n")
-	b.WriteString(dim.Render(strings.Repeat("─", rowWidth(colW))))
+	b.WriteString(gutter + dim.Render(strings.Repeat("─", rowWidth(colW))))
 	b.WriteString("\n")
 	for i := range rows {
 		texts := make([]string, len(headers))
@@ -211,7 +245,7 @@ func renderTable(arr []any, width int) (string, bool) {
 		}
 		// the index column reads as a quiet gutter, not data
 		kinds[0] = kEmpty
-		b.WriteString(renderRowCells(texts, kinds, colW, numeric))
+		b.WriteString(mark(i) + renderRowCells(texts, kinds, colW, numeric))
 		if i < len(rows)-1 {
 			b.WriteString("\n")
 		}

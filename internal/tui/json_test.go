@@ -43,7 +43,7 @@ func TestDecodeOrderedRejectsNonJSON(t *testing.T) {
 
 func TestRenderTableArrayOfObjects(t *testing.T) {
 	raw := `[{"name":"openai","models":3,"enabled":true},{"name":"anthropic","models":5,"enabled":false}]`
-	got, ok := renderTable(decodeOK(t, raw).([]any), 80)
+	got, ok := renderTable(decodeOK(t, raw).([]any), 80, -1)
 	if !ok {
 		t.Fatal("array of objects should render as a table")
 	}
@@ -70,7 +70,7 @@ func TestRenderTableCapsRows(t *testing.T) {
 		sb.WriteString(`{"id":` + strconv.Itoa(i) + `}`)
 	}
 	sb.WriteByte(']')
-	got, ok := renderTable(decodeOK(t, sb.String()).([]any), 80)
+	got, ok := renderTable(decodeOK(t, sb.String()).([]any), 80, -1)
 	if !ok {
 		t.Fatal("should render")
 	}
@@ -81,7 +81,7 @@ func TestRenderTableCapsRows(t *testing.T) {
 
 func TestRenderTableTruncatesWideColumns(t *testing.T) {
 	raw := `[{"note":"` + strings.Repeat("x", 200) + `"}]`
-	got, ok := renderTable(decodeOK(t, raw).([]any), 40)
+	got, ok := renderTable(decodeOK(t, raw).([]any), 40, -1)
 	if !ok {
 		t.Fatal("should render")
 	}
