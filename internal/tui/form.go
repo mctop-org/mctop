@@ -267,6 +267,11 @@ func (m model) formBody() string {
 	return b.String()
 }
 
+const (
+	maxPrettyBytes = 256 * 1024 // above this, skip the structured layout and show raw
+	maxResultLines = 5000       // hard cap so a huge result cannot choke the screen
+)
+
 func (m model) resultBody() string {
 	var b strings.Builder
 	if m.resultErr != nil {
@@ -278,19 +283,47 @@ func (m model) resultBody() string {
 	if m.output != "" {
 		b.WriteString(indent(m.renderOutput()))
 	}
-	return b.String()
+	return m.fitResult(b.String())
 }
 
-// renderOutput is the result payload as shown: pretty-colored JSON by default,
-// or the verbatim text wrapped to the viewport width in raw view and for any
-// non-JSON output, so nothing is clipped off the right edge.
+// renderOutput is the result payload as shown: a shape-aware layout by default,
+// or the verbatim text wrapped to the viewport width in raw view, for non-JSON
+// output, and for payloads too large to lay out cheaply.
 func (m model) renderOutput() string {
-	if !m.rawView {
+	if !m.rawView && len(m.output) <= maxPrettyBytes {
 		if pretty, ok := prettyJSON(m.output, m.vp.Width-2); ok {
 			return pretty
 		}
 	}
 	return wrapPlain(m.output, m.vp.Width-2)
+}
+
+// fitResult is the safety net that keeps a result from breaking the terminal: it
+// truncates every line to the pane width (ANSI-aware, so colors stay intact) and
+// caps the total line count, pointing at raw and copy for the remainder.
+func (m model) fitResult(s string) string {
+	w := m.vp.Width
+	if w < 1 {
+		w = m.width
+	}
+	lines := strings.Split(s, "\n")
+	truncated := false
+	if len(lines) > maxResultLines {
+		lines = lines[:maxResultLines]
+		truncated = true
+	}
+	if w > 0 {
+		for i, ln := range lines {
+			if ansi.StringWidth(ln) > w {
+				lines[i] = ansi.Truncate(ln, w, "…")
+			}
+		}
+	}
+	out := strings.Join(lines, "\n")
+	if truncated {
+		out += "\n" + dim.Render("  … output truncated. press t for raw, y to copy all.")
+	}
+	return out
 }
 
 // wrapPlain hard-wraps unstyled text to w columns so a long single line stays

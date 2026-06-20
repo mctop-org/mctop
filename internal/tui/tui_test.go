@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -156,6 +157,69 @@ func TestVimOffDisablesMotions(t *testing.T) {
 	m, _ = send(m, key("down"))
 	if m.cursor != 1 {
 		t.Fatalf("arrow keys should still move with vim off, got %d", m.cursor)
+	}
+}
+
+func TestResultBodyNeverExceedsWidth(t *testing.T) {
+	// A nested object with a very long string value takes the indented path,
+	// which does not wrap; fitResult must still keep every line within width.
+	m := model{screen: result, width: 40, height: 24}
+	m.vp = viewport.New(40, 10)
+	m.output = `{"a":{"x":"` + strings.Repeat("z", 600) + `"}}`
+	for _, ln := range strings.Split(m.resultBody(), "\n") {
+		if w := len([]rune(stripANSI(ln))); w > 40 {
+			t.Fatalf("line exceeds width 40 (%d): %q", w, stripANSI(ln))
+		}
+	}
+}
+
+func TestResultBodyCapsLineCount(t *testing.T) {
+	var sb strings.Builder
+	sb.WriteByte('[')
+	for i := 0; i < 7000; i++ {
+		if i > 0 {
+			sb.WriteByte(',')
+		}
+		sb.WriteByte('1')
+	}
+	sb.WriteByte(']')
+	m := model{screen: result, width: 60, height: 24}
+	m.vp = viewport.New(60, 10)
+	m.output = sb.String()
+	body := m.resultBody()
+	if n := strings.Count(body, "\n") + 1; n > maxResultLines+2 {
+		t.Fatalf("line count not capped: %d", n)
+	}
+	if !strings.Contains(body, "truncated") {
+		t.Fatal("expected a truncation note")
+	}
+}
+
+func TestTableCapsRows(t *testing.T) {
+	var sb strings.Builder
+	sb.WriteByte('[')
+	for i := 0; i < 1500; i++ {
+		if i > 0 {
+			sb.WriteByte(',')
+		}
+		sb.WriteString(`{"id":` + strconv.Itoa(i) + `}`)
+	}
+	sb.WriteByte(']')
+	got, ok := prettyJSON(sb.String(), 80)
+	if !ok {
+		t.Fatal("should render")
+	}
+	if !strings.Contains(stripANSI(got), "500 more rows") {
+		t.Fatalf("expected row cap note:\n%s", stripANSI(got)[:200])
+	}
+}
+
+func TestLargePayloadSkipsStructuredLayout(t *testing.T) {
+	m := model{screen: result, width: 60, height: 24}
+	m.vp = viewport.New(60, 10)
+	m.output = `{"data":"` + strings.Repeat("x", maxPrettyBytes) + `"}`
+	if out := m.renderOutput(); !strings.HasPrefix(out, "{") {
+		t.Fatal("a payload over the size cap should render raw, not aligned")
 	}
 }
 

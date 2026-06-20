@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -169,6 +170,12 @@ func renderTable(arr []any, width int) (string, bool) {
 		}
 		rows[i] = o
 	}
+	const maxTableRows = 1000
+	extra := 0
+	if len(rows) > maxTableRows {
+		extra = len(rows) - maxTableRows
+		rows = rows[:maxTableRows]
+	}
 
 	cols := orderedColumns(rows)
 	if len(cols) == 0 {
@@ -230,6 +237,9 @@ func renderTable(arr []any, width int) (string, bool) {
 		if i < len(rows)-1 {
 			b.WriteString("\n")
 		}
+	}
+	if extra > 0 {
+		b.WriteString("\n" + dim.Render(fmt.Sprintf("… %d more rows", extra)))
 	}
 	return b.String(), true
 }
