@@ -47,6 +47,44 @@ func TestCursorMovesAndClamps(t *testing.T) {
 	}
 }
 
+func TestJumpTopBottom(t *testing.T) {
+	m := testModel() // two tools
+	m, _ = send(m, key("G"))
+	if m.cursor != 1 {
+		t.Fatalf("G should jump to last item, got %d", m.cursor)
+	}
+	m, _ = send(m, key("g"))
+	if m.cursor != 0 {
+		t.Fatalf("g should jump to top, got %d", m.cursor)
+	}
+}
+
+func TestHelpToggle(t *testing.T) {
+	m := testModel()
+	m, _ = send(m, key("?"))
+	if !m.showHelp {
+		t.Fatal("? should open the help overlay")
+	}
+	m, _ = send(m, key("j"))
+	if m.showHelp {
+		t.Fatal("any key should close the help overlay")
+	}
+}
+
+func TestResultGoesBack(t *testing.T) {
+	for _, msg := range []tea.KeyMsg{
+		{Type: tea.KeyRunes, Runes: []rune("h")},
+		{Type: tea.KeyLeft},
+		{Type: tea.KeyEsc},
+	} {
+		m := model{screen: result, width: 80, height: 24, spin: newSpinner()}
+		next, _ := m.Update(msg)
+		if next.(model).screen != browse {
+			t.Fatalf("key %v should return to browse", msg)
+		}
+	}
+}
+
 func TestSearchFilters(t *testing.T) {
 	m := testModel() // tools: alpha, beta
 	m, _ = send(m, key("/"))

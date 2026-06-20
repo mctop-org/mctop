@@ -167,31 +167,39 @@ func (m model) updateResult(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch key.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
-	case "esc":
+	case "?":
+		m.showHelp = true
+	case "esc", "h", "left", "backspace":
 		m.screen = browse
-		return m, nil
 	case "e":
 		if m.formTool != nil {
 			m.screen = form
 		}
-		return m, nil
 	case "r":
 		if m.lastCmd != nil {
 			m.running = true
-			return m, m.lastCmd
+			return m, tea.Batch(m.lastCmd, m.spin.Tick)
 		}
-		return m, nil
+	case "j", "down":
+		m.vp.LineDown(1)
+	case "k", "up":
+		m.vp.LineUp(1)
+	case "ctrl+d":
+		m.vp.HalfViewDown()
+	case "ctrl+u":
+		m.vp.HalfViewUp()
+	case "g", "home":
+		m.vp.GotoTop()
+	case "G", "end":
+		m.vp.GotoBottom()
 	}
-	// Otherwise scroll the result (up/down, page keys).
-	var cmd tea.Cmd
-	m.vp, cmd = m.vp.Update(key)
-	return m, cmd
+	return m, nil
 }
 
 func (m model) viewForm() string {
 	bh := m.bodyHeight()
 	body := lipgloss.NewStyle().Height(bh).MaxHeight(bh).Padding(1, 3).Render(m.formBody())
-	footer := m.rule() + "\n" + dim.Render("  ↑↓ field   enter run   esc back")
+	footer := m.rule() + "\n" + dim.Render("  tab field  ·  enter run  ·  esc back")
 	return m.layout(m.header(m.formTool.Name, dim.Render("fill arguments")), body, footer)
 }
 
@@ -250,9 +258,9 @@ func (m model) viewResult() string {
 	if m.resultErr != nil {
 		status = red.Render("✗ ") + dim.Render(m.elapsed)
 	}
-	keys := "  r re-run   esc back   q quit"
+	keys := "  ↑↓ scroll  ·  esc back  ·  r re-run  ·  ? keys"
 	if m.formTool != nil {
-		keys = "  r re-run   e edit args   esc back   q quit"
+		keys = "  ↑↓ scroll  ·  esc back  ·  r re-run  ·  e edit  ·  ? keys"
 	}
 	pct := ""
 	if m.vp.TotalLineCount() > m.vp.Height {

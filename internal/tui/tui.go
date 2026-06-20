@@ -82,6 +82,7 @@ type model struct {
 	cursor    int // position within the active section's visible (filtered) items
 	query     string
 	searching bool
+	showHelp  bool
 
 	width, height int
 
@@ -142,6 +143,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
+	// The help overlay swallows the next keypress to dismiss itself.
+	if key, ok := msg.(tea.KeyMsg); ok && m.showHelp {
+		if key.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+		m.showHelp = false
+		return m, nil
+	}
+
 	switch m.screen {
 	case form:
 		return m.updateForm(msg)
@@ -160,29 +170,49 @@ func (m model) updateBrowse(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.searching {
 		return m.updateSearch(key)
 	}
+	last := len(m.visibleItems()) - 1
 	switch key.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
+	case "?":
+		m.showHelp = true
 	case "/":
 		m.searching = true
 	case "esc":
 		m.query, m.cursor = "", 0
-	case "tab":
+	case "tab", "]", "L":
 		m.section, m.cursor, m.query = (m.section+1)%3, 0, ""
-	case "shift+tab":
+	case "shift+tab", "[", "H":
 		m.section, m.cursor, m.query = (m.section+2)%3, 0, ""
 	case "up", "k":
-		if m.cursor > 0 {
-			m.cursor--
-		}
+		m.cursor = clamp(m.cursor-1, 0, last)
 	case "down", "j":
-		if m.cursor < len(m.visibleItems())-1 {
-			m.cursor++
-		}
+		m.cursor = clamp(m.cursor+1, 0, last)
+	case "ctrl+u":
+		m.cursor = clamp(m.cursor-10, 0, last)
+	case "ctrl+d":
+		m.cursor = clamp(m.cursor+10, 0, last)
+	case "g", "home":
+		m.cursor = 0
+	case "G", "end":
+		m.cursor = clamp(last, 0, last)
 	case "enter", "right", "l":
 		return m.open()
 	}
 	return m, nil
+}
+
+func clamp(v, lo, hi int) int {
+	switch {
+	case hi < lo:
+		return lo
+	case v < lo:
+		return lo
+	case v > hi:
+		return hi
+	default:
+		return v
+	}
 }
 
 // updateSearch handles keys while the search box is active: typing refines the
@@ -275,6 +305,9 @@ func (m model) View() string {
 	if m.width == 0 || m.height == 0 {
 		return ""
 	}
+	if m.showHelp {
+		return m.helpView()
+	}
 	switch m.screen {
 	case form:
 		return m.viewForm()
@@ -283,6 +316,30 @@ func (m model) View() string {
 	default:
 		return m.viewBrowse()
 	}
+}
+
+// helpView lists every keybind, the same in any screen.
+func (m model) helpView() string {
+	binds := [][2]string{
+		{"j / k   ↓ / ↑", "move up and down"},
+		{"g / G", "jump to top / bottom"},
+		{"ctrl+d / ctrl+u", "half page down / up"},
+		{"enter / l / →", "open the selected item"},
+		{"esc / h / ←", "go back"},
+		{"tab / shift+tab", "next / previous section"},
+		{"/", "search the current list"},
+		{"r", "re-run a result"},
+		{"e", "edit a call's arguments"},
+		{"?", "toggle this help"},
+		{"q", "quit"},
+	}
+	var b strings.Builder
+	b.WriteString(dim.Render("Navigate with the arrow keys or vim motions.") + "\n\n")
+	for _, kb := range binds {
+		b.WriteString(accent.Render(fmt.Sprintf("  %-18s", kb[0])) + dim.Render(kb[1]) + "\n")
+	}
+	body := lipgloss.NewStyle().Height(m.bodyHeight()).MaxHeight(m.bodyHeight()).Padding(1, 3).Render(b.String())
+	return m.layout(m.header("keys", dim.Render("help")), body, m.rule()+"\n"+dim.Render("  any key to close"))
 }
 
 // bodyHeight is the rows between the header and footer.
@@ -477,9 +534,9 @@ func (m model) toolDetail(t *sdk.Tool) string {
 }
 
 func (m model) footerView() string {
-	left := "  " + dim.Render("↑↓ move   enter open   / search   tab section   q quit")
+	left := "  " + dim.Render("enter open  ·  / search  ·  tab section  ·  ? keys")
 	if m.searching {
-		left = "  " + accent.Render("/"+m.query) + dim.Render("   enter open   esc cancel")
+		left = "  " + accent.Render("/"+m.query) + dim.Render("   enter open  ·  esc cancel")
 	}
 	right := ""
 	if n := len(m.visibleItems()); n > 0 {
