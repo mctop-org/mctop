@@ -69,10 +69,12 @@ Results are shown as an insight view that reads the data: field names become
 plain labels, values are formatted by what they are (dates, yes/no, status,
 links, grouped numbers), nested objects become sections, arrays of objects
 become tables, and short fields flow into columns to fill the screen. When the
-result is a table, `↑`/`↓` select a row and `enter` expands it into a full,
-untruncated view of that record; `esc` collapses back to the list. Press `t`
-for the colored JSON, `y` to copy. `r` re-runs, `e` edits the arguments, `esc`
-(or `←`) goes back.
+result is a list of records (a bare array, or one wrapped in a `{status, total,
+data: [...]}` envelope), `↑`/`↓` select a row and `enter` expands it into a full,
+untruncated view of that record; `esc` collapses back to the list. A wide record
+shows a scannable few columns in the table and the rest on expand. Press `t` for
+the colored JSON, `y` to copy. `r` re-runs, `e` edits the arguments, `esc` (or
+`←`) goes back.
 
 Vim motions (`h`/`j`/`k`/`l`, `g`/`G`) are on by default; `V` toggles them and the
 choice is remembered. The arrow keys always work either way. Press `?` for the

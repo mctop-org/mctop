@@ -100,6 +100,8 @@ type model struct {
 	elapsed     string
 	jsonView    bool      // result screen: show colored JSON instead of the insight view
 	rows        []*object // result screen: the records when the payload is a table, enabling row navigation
+	rowEnvelope *object   // the wrapping object when the records are nested under one field, nil for a bare array
+	rowsKey     string    // the envelope field that holds the records, for the table's title
 	rowCursor   int       // selected record in the table
 	rowOpen     bool      // a single record is expanded into its own detail view
 	yankSeq     string    // OSC52 sequence to emit on the next render, cleared on the next key
@@ -137,11 +139,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.running = false
 		m.output, m.resultErr, m.elapsed = msg.output, msg.err, msg.elapsed
 		m.jsonView = false
-		m.rows, m.rowCursor, m.rowOpen = nil, 0, false
-		// A successful array-of-objects result becomes row-navigable.
+		m.rows, m.rowEnvelope, m.rowsKey, m.rowCursor, m.rowOpen = nil, nil, "", 0, false
+		// A successful result whose records are an array of objects, bare or
+		// wrapped in an envelope, becomes row-navigable.
 		if msg.err == nil && len(msg.output) <= maxPrettyBytes {
 			if v, e := decodeOrdered(msg.output); e == nil {
-				m.rows = asObjectRows(v)
+				m.rows, m.rowEnvelope, m.rowsKey = detectRows(v)
 			}
 		}
 		m.screen = result

@@ -322,14 +322,18 @@ func (m *model) rowPage() int {
 	return 1
 }
 
-// ensureRowVisible scrolls the viewport so the highlighted row stays in view. The
-// table prints a header and a divider before the first record, so row i sits on
-// line i+2 (a table result carries no error prefix).
+// rowsTopOffset is the line the first record sits on: any envelope summary, then
+// the table's header and divider (a table result carries no error prefix).
+func (m model) rowsTopOffset() int {
+	return strings.Count(m.rowPrefix(m.vp.Width-2), "\n") + 2
+}
+
+// ensureRowVisible scrolls the viewport so the highlighted row stays in view.
 func (m *model) ensureRowVisible() {
 	if m.vp.Height < 1 {
 		return
 	}
-	line := 2 + m.rowCursor
+	line := m.rowsTopOffset() + m.rowCursor
 	switch top := m.vp.YOffset; {
 	case line < top:
 		m.vp.SetYOffset(line)
@@ -417,10 +421,27 @@ func (m model) renderOutput() string {
 			return humanValue(m.rows[m.rowCursor], w, 0)
 		}
 		if t, ok := renderObjectTable(m.rows, w, m.rowCursor); ok {
-			return t
+			return m.rowPrefix(w) + t
 		}
 	}
 	return humanValue(v, w, 0)
+}
+
+// rowPrefix is what precedes the record table in the list view: for an envelope
+// result, the wrapping object's other fields as a summary, then the table's
+// titled heading. It is empty for a bare array.
+func (m model) rowPrefix(w int) string {
+	if m.rowEnvelope == nil {
+		return ""
+	}
+	var b strings.Builder
+	if rest := m.rowEnvelope.without(m.rowsKey); len(rest.keys) > 0 {
+		b.WriteString(humanObject(rest, w, 0))
+		b.WriteString("\n\n")
+	}
+	b.WriteString(accent.Bold(true).Render(humanLabel(m.rowsKey)) +
+		dim.Render(fmt.Sprintf("  (%d)", len(m.rows))) + "\n")
+	return b.String()
 }
 
 // fitResult is the safety net that keeps a result from breaking the terminal: it

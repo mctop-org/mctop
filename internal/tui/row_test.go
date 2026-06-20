@@ -2,6 +2,7 @@ package tui
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -71,6 +72,58 @@ func TestCallResultDetectsTable(t *testing.T) {
 	m, _ = send(m, callResultMsg{err: errors.New("boom"), output: `[{"a":1}]`, elapsed: "1ms"})
 	if m.rows != nil {
 		t.Fatal("an errored result should not be row-navigable")
+	}
+}
+
+func TestDetectRowsEnvelope(t *testing.T) {
+	rows, env, key := detectRows(decodeMust(`{"status":"ok","total":2,"records":[{"a":1},{"a":2}]}`))
+	if len(rows) != 2 || env == nil || key != "records" {
+		t.Fatalf("envelope not detected: rows=%d env=%v key=%q", len(rows), env, key)
+	}
+	if rows, env, _ := detectRows(decodeMust(`[{"a":1}]`)); len(rows) != 1 || env != nil {
+		t.Fatal("a bare array should have rows and no envelope")
+	}
+	if r, _, _ := detectRows(decodeMust(`{"a":[{"x":1}],"b":[{"y":2}]}`)); r != nil {
+		t.Fatal("two record arrays are ambiguous and should not be navigable")
+	}
+	if r, _, _ := detectRows(decodeMust(`{"a":1,"b":"x"}`)); r != nil {
+		t.Fatal("a plain object should not be navigable")
+	}
+}
+
+func TestEnvelopeRowNavigation(t *testing.T) {
+	m := model{width: 100, height: 24, spin: newSpinner(), vim: true}
+	m.vp = viewport.New(100, 12)
+	out := `{"status":"ok","total":3,"records":[{"id":1,"name":"a"},{"id":2,"name":"b"},{"id":3,"name":"c"}]}`
+	m, _ = send(m, callResultMsg{output: out, elapsed: "1ms"})
+	if len(m.rows) != 3 || m.rowEnvelope == nil {
+		t.Fatal("an envelope result should be row-navigable")
+	}
+	if !strings.Contains(stripANSI(m.resultBody()), "Records") {
+		t.Fatal("the list should show the records section title above the table")
+	}
+	m, _ = send(m, key("down"))
+	if m.rowCursor != 1 {
+		t.Fatalf("down should select row 1, got %d", m.rowCursor)
+	}
+	m, _ = send(m, enterKey)
+	if !m.rowOpen {
+		t.Fatal("enter should expand a nested-envelope row")
+	}
+}
+
+func TestTableCapsColumns(t *testing.T) {
+	var fields []string
+	for i := 0; i < 20; i++ {
+		fields = append(fields, fmt.Sprintf(`"f%d":%d`, i, i))
+	}
+	raw := `[{` + strings.Join(fields, ",") + `}]`
+	got, ok := renderObjectTable(asObjectRows(decodeMust(raw)), 100, 0)
+	if !ok {
+		t.Fatal("should render")
+	}
+	if !strings.Contains(stripANSI(got), "more fields per record") {
+		t.Fatalf("a wide record should note the hidden fields:\n%s", stripANSI(got))
 	}
 }
 
