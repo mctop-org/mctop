@@ -96,7 +96,8 @@ type model struct {
 	output      string
 	resultErr   error
 	elapsed     string
-	rawView     bool // result screen: show the verbatim payload instead of pretty JSON
+	rawView     bool   // result screen: show the verbatim payload instead of pretty JSON
+	yankSeq     string // OSC52 sequence to emit on the next render, cleared on the next key
 	vp          viewport.Model
 	spin        spinner.Model
 }
@@ -143,6 +144,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.spin, cmd = m.spin.Update(msg)
 		return m, cmd
+	}
+
+	// A yank rides along in one render frame; the next key clears it so the
+	// OSC52 sequence is emitted to the terminal exactly once.
+	if _, ok := msg.(tea.KeyMsg); ok {
+		m.yankSeq = ""
 	}
 
 	// The help overlay swallows the next keypress to dismiss itself.
@@ -307,6 +314,12 @@ func (m model) View() string {
 	if m.width == 0 || m.height == 0 {
 		return ""
 	}
+	// A pending yank is prefixed to the frame so the OSC52 sequence is written
+	// through bubbletea's own output rather than racing it on stdout.
+	return m.yankSeq + m.screenView()
+}
+
+func (m model) screenView() string {
 	if m.showHelp {
 		return m.helpView()
 	}
@@ -332,6 +345,7 @@ func (m model) helpView() string {
 		{"/", "search the current list"},
 		{"r", "re-run a result"},
 		{"t", "toggle raw / pretty result"},
+		{"y", "copy the result to the clipboard"},
 		{"e", "edit a call's arguments"},
 		{"?", "toggle this help"},
 		{"q", "quit"},

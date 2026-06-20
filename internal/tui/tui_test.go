@@ -112,6 +112,25 @@ func TestResultViewToggleIgnoredForNonJSON(t *testing.T) {
 	}
 }
 
+func TestYankCopiesAndClears(t *testing.T) {
+	m := model{screen: result, width: 80, height: 24, spin: newSpinner(), output: `{"a":1}`}
+	m.vp = viewport.New(80, 10)
+	m, _ = send(m, key("y"))
+	if !strings.HasPrefix(m.yankSeq, "\x1b]52;c;") {
+		t.Fatalf("y should stage an OSC52 clipboard sequence, got %q", m.yankSeq)
+	}
+	if !strings.Contains(m.View(), m.yankSeq) {
+		t.Fatal("the staged sequence should ride along in the next frame")
+	}
+	if !strings.Contains(m.View(), "copied") {
+		t.Fatal("the footer should confirm the copy")
+	}
+	m, _ = send(m, key("j"))
+	if m.yankSeq != "" {
+		t.Fatal("the next key should clear the yank so OSC52 emits once")
+	}
+}
+
 func TestSearchFilters(t *testing.T) {
 	m := testModel() // tools: alpha, beta
 	m, _ = send(m, key("/"))

@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/aloki-alok/mctop/internal/mcp"
@@ -187,6 +188,10 @@ func (m model) updateResult(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.vp.SetContent(m.resultBody())
 			m.vp.SetYOffset(off)
 		}
+	case "y":
+		if m.output != "" {
+			m.yankSeq = ansi.SetSystemClipboard(m.output)
+		}
 	case "j", "down":
 		m.vp.LineDown(1)
 	case "k", "up":
@@ -313,12 +318,16 @@ func (m model) viewResult() string {
 		}
 		keys += "  ·  t " + to
 	}
-	keys += "  ·  ? keys"
+	keys += "  ·  y copy  ·  ? keys"
 	pct := ""
 	if m.vp.TotalLineCount() > m.vp.Height {
 		pct = dim.Render(fmt.Sprintf("%d%%  ", int(m.vp.ScrollPercent()*100)))
 	}
-	footer := m.rule() + "\n" + m.spread(dim.Render(keys), pct)
+	right := pct
+	if m.yankSeq != "" {
+		right = green.Render("copied  ") + pct
+	}
+	footer := m.rule() + "\n" + m.spread(dim.Render(keys), right)
 	return m.layout(m.header(m.resultTitle+" → result", status), m.vp.View(), footer)
 }
 
