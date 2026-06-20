@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -82,6 +83,32 @@ func TestResultGoesBack(t *testing.T) {
 		if next.(model).screen != browse {
 			t.Fatalf("key %v should return to browse", msg)
 		}
+	}
+}
+
+func TestResultViewToggle(t *testing.T) {
+	m := model{screen: result, width: 80, height: 24, spin: newSpinner(), output: `{"a":1}`}
+	m.vp = viewport.New(80, 10)
+	m.vp.SetContent(m.resultBody())
+	if m.rawView {
+		t.Fatal("results should default to the pretty view")
+	}
+	m, _ = send(m, key("t"))
+	if !m.rawView {
+		t.Fatal("t should switch to the raw view")
+	}
+	m, _ = send(m, key("t"))
+	if m.rawView {
+		t.Fatal("t should switch back to pretty")
+	}
+}
+
+func TestResultViewToggleIgnoredForNonJSON(t *testing.T) {
+	m := model{screen: result, width: 80, height: 24, spin: newSpinner(), output: "plain text"}
+	m.vp = viewport.New(80, 10)
+	m, _ = send(m, key("t"))
+	if m.rawView {
+		t.Fatal("t should do nothing when the result is not JSON")
 	}
 }
 

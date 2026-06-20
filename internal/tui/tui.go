@@ -96,6 +96,7 @@ type model struct {
 	output      string
 	resultErr   error
 	elapsed     string
+	rawView     bool // result screen: show the verbatim payload instead of pretty JSON
 	vp          viewport.Model
 	spin        spinner.Model
 }
@@ -129,6 +130,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case callResultMsg:
 		m.running = false
 		m.output, m.resultErr, m.elapsed = msg.output, msg.err, msg.elapsed
+		m.rawView = false
 		m.screen = result
 		m.vp.SetContent(m.resultBody())
 		m.vp.GotoTop()
@@ -329,6 +331,7 @@ func (m model) helpView() string {
 		{"tab / shift+tab", "next / previous section"},
 		{"/", "search the current list"},
 		{"r", "re-run a result"},
+		{"t", "toggle raw / pretty result"},
 		{"e", "edit a call's arguments"},
 		{"?", "toggle this help"},
 		{"q", "quit"},

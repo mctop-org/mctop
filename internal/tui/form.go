@@ -180,6 +180,13 @@ func (m model) updateResult(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.running = true
 			return m, tea.Batch(m.lastCmd, m.spin.Tick)
 		}
+	case "t":
+		if m.outputIsJSON() {
+			m.rawView = !m.rawView
+			off := m.vp.YOffset
+			m.vp.SetContent(m.resultBody())
+			m.vp.SetYOffset(off)
+		}
 	case "j", "down":
 		m.vp.LineDown(1)
 	case "k", "up":
@@ -242,9 +249,46 @@ func (m model) resultBody() string {
 		}
 	}
 	if m.output != "" {
-		b.WriteString(indent(m.output))
+		b.WriteString(indent(m.renderOutput()))
 	}
 	return b.String()
+}
+
+// renderOutput is the result payload as shown: pretty-colored JSON by default,
+// or the verbatim text wrapped to the viewport width in raw view and for any
+// non-JSON output, so nothing is clipped off the right edge.
+func (m model) renderOutput() string {
+	if !m.rawView {
+		if pretty, ok := prettyJSON(m.output); ok {
+			return pretty
+		}
+	}
+	return wrapPlain(m.output, m.vp.Width-2)
+}
+
+// wrapPlain hard-wraps unstyled text to w columns so a long single line stays
+// fully scrollable. It is only used on text without ANSI styling, so wrapping by
+// rune count is exact.
+func wrapPlain(s string, w int) string {
+	if w < 1 {
+		return s
+	}
+	var out []string
+	for _, line := range strings.Split(s, "\n") {
+		r := []rune(line)
+		for len(r) > w {
+			out = append(out, string(r[:w]))
+			r = r[w:]
+		}
+		out = append(out, string(r))
+	}
+	return strings.Join(out, "\n")
+}
+
+// outputIsJSON reports whether the result can be pretty-printed, which gates the
+// raw/pretty toggle.
+func (m model) outputIsJSON() bool {
+	return m.output != "" && json.Valid([]byte(m.output))
 }
 
 func (m model) viewResult() string {
@@ -258,10 +302,18 @@ func (m model) viewResult() string {
 	if m.resultErr != nil {
 		status = red.Render("✗ ") + dim.Render(m.elapsed)
 	}
-	keys := "  ↑↓ scroll  ·  esc back  ·  r re-run  ·  ? keys"
+	keys := "  ↑↓ scroll  ·  esc back  ·  r re-run"
 	if m.formTool != nil {
-		keys = "  ↑↓ scroll  ·  esc back  ·  r re-run  ·  e edit  ·  ? keys"
+		keys += "  ·  e edit"
 	}
+	if m.outputIsJSON() {
+		to := "raw"
+		if m.rawView {
+			to = "pretty"
+		}
+		keys += "  ·  t " + to
+	}
+	keys += "  ·  ? keys"
 	pct := ""
 	if m.vp.TotalLineCount() > m.vp.Height {
 		pct = dim.Render(fmt.Sprintf("%d%%  ", int(m.vp.ScrollPercent()*100)))
