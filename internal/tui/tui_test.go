@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"strconv"
 	"strings"
 	"testing"
 
@@ -92,15 +91,15 @@ func TestResultViewToggle(t *testing.T) {
 	m := model{screen: result, width: 80, height: 24, spin: newSpinner(), output: `{"a":1}`}
 	m.vp = viewport.New(80, 10)
 	m.vp.SetContent(m.resultBody())
-	if m.rawView {
+	if m.jsonView {
 		t.Fatal("results should default to the pretty view")
 	}
 	m, _ = send(m, key("t"))
-	if !m.rawView {
+	if !m.jsonView {
 		t.Fatal("t should switch to the raw view")
 	}
 	m, _ = send(m, key("t"))
-	if m.rawView {
+	if m.jsonView {
 		t.Fatal("t should switch back to pretty")
 	}
 }
@@ -109,7 +108,7 @@ func TestResultViewToggleIgnoredForNonJSON(t *testing.T) {
 	m := model{screen: result, width: 80, height: 24, spin: newSpinner(), output: "plain text"}
 	m.vp = viewport.New(80, 10)
 	m, _ = send(m, key("t"))
-	if m.rawView {
+	if m.jsonView {
 		t.Fatal("t should do nothing when the result is not JSON")
 	}
 }
@@ -192,25 +191,6 @@ func TestResultBodyCapsLineCount(t *testing.T) {
 	}
 	if !strings.Contains(body, "truncated") {
 		t.Fatal("expected a truncation note")
-	}
-}
-
-func TestTableCapsRows(t *testing.T) {
-	var sb strings.Builder
-	sb.WriteByte('[')
-	for i := 0; i < 1500; i++ {
-		if i > 0 {
-			sb.WriteByte(',')
-		}
-		sb.WriteString(`{"id":` + strconv.Itoa(i) + `}`)
-	}
-	sb.WriteByte(']')
-	got, ok := prettyJSON(sb.String(), 80)
-	if !ok {
-		t.Fatal("should render")
-	}
-	if !strings.Contains(stripANSI(got), "500 more rows") {
-		t.Fatalf("expected row cap note:\n%s", stripANSI(got)[:200])
 	}
 }
 

@@ -205,7 +205,7 @@ func (m model) updateResult(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case "t":
 		if m.outputIsJSON() {
-			m.rawView = !m.rawView
+			m.jsonView = !m.jsonView
 			off := m.vp.YOffset
 			m.vp.SetContent(m.resultBody())
 			m.vp.SetYOffset(off)
@@ -286,16 +286,23 @@ func (m model) resultBody() string {
 	return m.fitResult(b.String())
 }
 
-// renderOutput is the result payload as shown: a shape-aware layout by default,
-// or the verbatim text wrapped to the viewport width in raw view, for non-JSON
-// output, and for payloads too large to lay out cheaply.
+// renderOutput is the result payload as shown: the insight view by default, the
+// colored indented JSON when the JSON view is toggled, and plain wrapped text for
+// non-JSON output or payloads too large to lay out cheaply.
 func (m model) renderOutput() string {
-	if !m.rawView && len(m.output) <= maxPrettyBytes {
-		if pretty, ok := prettyJSON(m.output, m.vp.Width-2); ok {
-			return pretty
+	w := m.vp.Width - 2
+	if len(m.output) <= maxPrettyBytes {
+		if v, err := decodeOrdered(m.output); err == nil {
+			if m.jsonView {
+				if s, ok := indentJSON(m.output); ok {
+					return s
+				}
+			} else {
+				return humanValue(v, w, 0)
+			}
 		}
 	}
-	return wrapPlain(m.output, m.vp.Width-2)
+	return wrapPlain(m.output, w)
 }
 
 // fitResult is the safety net that keeps a result from breaking the terminal: it
@@ -367,9 +374,9 @@ func (m model) viewResult() string {
 		keys += "  ·  e edit"
 	}
 	if m.outputIsJSON() {
-		to := "raw"
-		if m.rawView {
-			to = "pretty"
+		to := "json"
+		if m.jsonView {
+			to = "insight"
 		}
 		keys += "  ·  t " + to
 	}

@@ -22,28 +22,6 @@ var (
 	reNum = regexp.MustCompile(`-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?`)
 )
 
-// prettyJSON lays a JSON result out to use the horizontal space: an array of
-// objects becomes a table, a flat object becomes an aligned key/value block, and
-// anything nested falls back to indented, colored JSON. It returns ok=false when
-// the input is not valid JSON so callers keep the raw text.
-func prettyJSON(raw string, width int) (string, bool) {
-	v, err := decodeOrdered(raw)
-	if err != nil {
-		return "", false
-	}
-	switch x := v.(type) {
-	case []any:
-		if t, ok := renderTable(x, width); ok {
-			return t, true
-		}
-	case *object:
-		if t, ok := renderFlatObject(x, width); ok {
-			return t, true
-		}
-	}
-	return indentJSON(raw)
-}
-
 // object is a JSON object that remembers its key order, which json.Unmarshal into
 // a map would lose. Column and row order follow the original payload.
 type object struct {
@@ -320,53 +298,6 @@ func renderHeader(texts []string, colW []int, numeric []bool) string {
 		cells[j] = accent.Render(t)
 	}
 	return strings.Join(cells, "  ")
-}
-
-// renderFlatObject lays an object of scalar values out as an aligned key/value
-// block. It declines when any value is nested or the pane is too narrow.
-func renderFlatObject(o *object, width int) (string, bool) {
-	if len(o.keys) == 0 {
-		return "", false
-	}
-	keyW := 0
-	for _, k := range o.keys {
-		if _, _, nested := scalar(o.vals[k]); nested {
-			return "", false
-		}
-		if w := cellWidth(k); w > keyW {
-			keyW = w
-		}
-	}
-	if keyW > 28 {
-		keyW = 28
-	}
-	valW := width - keyW - 2
-	if valW < 8 {
-		return "", false
-	}
-
-	var b strings.Builder
-	for _, k := range o.keys {
-		text, kind, _ := scalar(o.vals[k])
-		lines := strings.Split(wrapPlain(text, valW), "\n")
-		for li, ln := range lines {
-			if li == 0 {
-				b.WriteString(accent.Render(ellipsize(k, keyW)) + strings.Repeat(" ", keyW-min(cellWidth(k), keyW)+2))
-			} else {
-				b.WriteString(strings.Repeat(" ", keyW+2))
-			}
-			b.WriteString(styleCell(ln, kind))
-			b.WriteString("\n")
-		}
-	}
-	return strings.TrimRight(b.String(), "\n"), true
-}
-
-// scalar renders a scalar value to text with its kind, reporting nested=true for
-// objects and arrays so callers can decline a flat layout.
-func scalar(v any) (text string, kind int, nested bool) {
-	c := toCell(v, true)
-	return c.text, c.kind, c.kind == kNested
 }
 
 // compact renders any decoded value back to minified JSON for a table cell that

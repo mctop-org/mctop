@@ -98,7 +98,7 @@ type model struct {
 	output      string
 	resultErr   error
 	elapsed     string
-	rawView     bool   // result screen: show the verbatim payload instead of pretty JSON
+	jsonView    bool   // result screen: show colored JSON instead of the insight view
 	yankSeq     string // OSC52 sequence to emit on the next render, cleared on the next key
 	vp          viewport.Model
 	spin        spinner.Model
@@ -133,7 +133,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case callResultMsg:
 		m.running = false
 		m.output, m.resultErr, m.elapsed = msg.output, msg.err, msg.elapsed
-		m.rawView = false
+		m.jsonView = false
 		m.screen = result
 		m.vp.SetContent(m.resultBody())
 		m.vp.GotoTop()
@@ -381,7 +381,7 @@ func (m model) helpView() string {
 		{"tab / shift+tab", "next / previous section"},
 		{"/", "search the current list"},
 		{"r", "re-run a result"},
-		{"t", "toggle raw / pretty result"},
+		{"t", "toggle insight / JSON result"},
 		{"y", "copy the result to the clipboard"},
 		{"e", "edit a call's arguments"},
 		{"V", "turn vim motions on or off"},
