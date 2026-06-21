@@ -26,6 +26,11 @@ type Options struct {
 	// auth lives. They are ignored for stdio targets, which have no request
 	// headers.
 	Headers map[string]string
+
+	// SSE selects the legacy HTTP+SSE transport instead of streamable HTTP for an
+	// http(s):// target. It is for older servers that only speak SSE; modern
+	// servers use streamable HTTP, the default. Ignored for stdio targets.
+	SSE bool
 }
 
 // Connect dials a target and returns an initialized client. A target is either
@@ -33,7 +38,7 @@ type Options struct {
 // spawn over stdio (for example "uvx mcp-server-time"). Every JSON-RPC frame is
 // recorded so the trace view can show the protocol after the fact.
 func Connect(ctx context.Context, target string, opts Options) (*Client, error) {
-	transport, err := transportFor(target, opts.Headers)
+	transport, err := transportFor(target, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -46,15 +51,19 @@ func Connect(ctx context.Context, target string, opts Options) (*Client, error) 
 	return &Client{sess: sess, rec: rec}, nil
 }
 
-// transportFor picks the transport for a target: streamable HTTP for an
-// http(s):// URL (with any fixed headers), stdio otherwise.
-func transportFor(target string, headers map[string]string) (sdk.Transport, error) {
+// transportFor picks the transport for a target: an http(s):// URL gets
+// streamable HTTP, or legacy HTTP+SSE when opts.SSE is set, both carrying any
+// fixed headers; anything else is spawned over stdio.
+func transportFor(target string, opts Options) (sdk.Transport, error) {
 	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
-		t := &sdk.StreamableClientTransport{Endpoint: target}
-		if len(headers) > 0 {
-			t.HTTPClient = &http.Client{Transport: headerRoundTripper{headers: headers}}
+		var httpClient *http.Client
+		if len(opts.Headers) > 0 {
+			httpClient = &http.Client{Transport: headerRoundTripper{headers: opts.Headers}}
 		}
-		return t, nil
+		if opts.SSE {
+			return &sdk.SSEClientTransport{Endpoint: target, HTTPClient: httpClient}, nil
+		}
+		return &sdk.StreamableClientTransport{Endpoint: target, HTTPClient: httpClient}, nil
 	}
 	argv := strings.Fields(target)
 	if len(argv) == 0 {
