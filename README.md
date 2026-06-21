@@ -1,5 +1,9 @@
 # mctop
 
+[![release](https://img.shields.io/github/v/release/aloki-alok/mctop?label=release)](https://github.com/aloki-alok/mctop/releases)
+[![ci](https://img.shields.io/github/actions/workflow/status/aloki-alok/mctop/ci.yml?branch=main&label=ci)](https://github.com/aloki-alok/mctop/actions/workflows/ci.yml)
+[![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
+
 A terminal client for MCP servers. Connect to any server, browse its tools,
 resources, and prompts, call them, and watch the result, without leaving the
 shell. Then assert the server's contract in CI so a renamed tool or a drifted
@@ -134,4 +138,4 @@ mctop ls http://localhost:8080/mcp
 
 ## License
 
-MIT.
+MIT, see [LICENSE](./LICENSE).
