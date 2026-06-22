@@ -29,6 +29,7 @@ type callResultMsg struct {
 	output  string
 	err     error
 	elapsed string
+	doc     bool // a resource or prompt body, rendered as markdown rather than laid out as data
 }
 
 // openForm switches to the argument form for a tool, building one text field per
@@ -122,7 +123,7 @@ func (m model) readResource(uri string) tea.Cmd {
 		if err != nil {
 			return callResultMsg{err: err, elapsed: elapsed}
 		}
-		return callResultMsg{output: mcp.RenderResource(res), elapsed: elapsed}
+		return callResultMsg{output: mcp.RenderResource(res), elapsed: elapsed, doc: true}
 	}
 }
 
@@ -137,7 +138,7 @@ func (m model) getPrompt(name string) tea.Cmd {
 		if err != nil {
 			return callResultMsg{err: err, elapsed: elapsed}
 		}
-		return callResultMsg{output: mcp.RenderPrompt(res), elapsed: elapsed}
+		return callResultMsg{output: mcp.RenderPrompt(res), elapsed: elapsed, doc: true}
 	}
 }
 
@@ -241,7 +242,7 @@ func (m model) updateResult(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(m.lastCmd, m.spin.Tick)
 		}
 	case "t":
-		if m.outputIsJSON() {
+		if m.outputIsJSON() || m.doc {
 			m.jsonView = !m.jsonView
 			m.rowOpen = false
 			off := m.vp.YOffset
@@ -408,6 +409,11 @@ func (m model) renderOutput() string {
 	}
 	v, err := decodeOrdered(m.output)
 	if err != nil {
+		// Not JSON: a resource or prompt body renders as markdown (toggle to the
+		// raw source with t); any other plain text just wraps.
+		if m.doc && !m.jsonView {
+			return renderMarkdown(m.output, w-2)
+		}
 		return wrapPlain(m.output, w)
 	}
 	if m.jsonView {
@@ -521,7 +527,14 @@ func (m model) viewResult() string {
 	if m.formTool != nil {
 		keys += "  ·  e edit"
 	}
-	if m.outputIsJSON() {
+	switch {
+	case m.doc && !m.outputIsJSON():
+		to := "raw"
+		if m.jsonView {
+			to = "rendered"
+		}
+		keys += "  ·  t " + to
+	case m.outputIsJSON():
 		to := "json"
 		if m.jsonView {
 			to = "insight"

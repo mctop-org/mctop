@@ -99,7 +99,8 @@ type model struct {
 	output      string
 	resultErr   error
 	elapsed     string
-	jsonView    bool      // result screen: show colored JSON instead of the insight view
+	jsonView    bool      // result screen: show the raw form (JSON for data, source for a doc) instead of the rendered view
+	doc         bool      // result screen: the output is a resource or prompt body, rendered as markdown
 	rows        []*object // result screen: the records when the payload is a table, enabling row navigation
 	rowEnvelope *object   // the wrapping object when the records are nested under one field, nil for a bare array
 	rowsKey     string    // the envelope field that holds the records, for the table's title
@@ -143,6 +144,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.running = false
 		m.output, m.resultErr, m.elapsed = msg.output, msg.err, msg.elapsed
 		m.jsonView = false
+		m.doc = msg.doc
 		m.rows, m.rowEnvelope, m.rowsKey, m.rowCursor, m.rowOpen = nil, nil, "", 0, false
 		// A successful result whose records are an array of objects, bare or
 		// wrapped in an envelope, becomes row-navigable.
