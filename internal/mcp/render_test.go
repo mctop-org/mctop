@@ -67,7 +67,7 @@ func TestRenderPromptRolesAndText(t *testing.T) {
 	out := RenderPrompt(&sdk.GetPromptResult{Messages: []*sdk.PromptMessage{
 		{Role: "user", Content: &sdk.TextContent{Text: "summarize this"}},
 	}})
-	if !strings.Contains(out, "[user]") || !strings.Contains(out, "summarize this") {
+	if !strings.Contains(out, "## user") || !strings.Contains(out, "summarize this") {
 		t.Errorf("prompt not rendered: %q", out)
 	}
 }

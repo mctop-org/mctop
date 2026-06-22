@@ -173,14 +173,16 @@ func RenderResource(r *sdk.ReadResourceResult) string {
 	return b.String()
 }
 
-// RenderPrompt flattens a prompt's messages into readable role-tagged text.
+// RenderPrompt flattens a prompt's messages into markdown: each message's role
+// becomes a heading above its content, so the result view can render it with the
+// message bodies (which are often markdown themselves) formatted.
 func RenderPrompt(r *sdk.GetPromptResult) string {
 	var b strings.Builder
 	for i, m := range r.Messages {
 		if i > 0 {
 			b.WriteString("\n\n")
 		}
-		fmt.Fprintf(&b, "[%s]\n%s", m.Role, RenderContent([]sdk.Content{m.Content}))
+		fmt.Fprintf(&b, "## %s\n\n%s", m.Role, RenderContent([]sdk.Content{m.Content}))
 	}
 	return b.String()
 }
