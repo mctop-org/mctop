@@ -649,6 +649,12 @@ func (m model) toolDetail(t *sdk.Tool) string {
 			if a.Desc != "" {
 				b.WriteString("\n" + dim.Render(a.Desc))
 			}
+			if len(a.Enum) > 0 {
+				b.WriteString("\n" + dim.Render("one of: ") + dim.Render(strings.Join(a.Enum, ", ")))
+			}
+			if a.Default != "" {
+				b.WriteString("\n" + dim.Render("default: "+a.Default))
+			}
 		}
 	}
 	b.WriteString("\n\n" + accent.Render("enter") + dim.Render(" to call"))

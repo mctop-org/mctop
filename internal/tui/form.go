@@ -39,7 +39,7 @@ func (m model) openForm(tool *sdk.Tool) model {
 	inputs := make([]formInput, len(args))
 	for i, a := range args {
 		ti := textinput.New()
-		ti.Placeholder = a.Type
+		ti.Placeholder = a.hint()
 		ti.Prompt = ""
 		inputs[i] = formInput{arg: a, input: ti}
 	}

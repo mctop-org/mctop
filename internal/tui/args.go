@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -14,6 +15,25 @@ type Arg struct {
 	Type     string
 	Desc     string
 	Required bool
+	Enum     []string // allowed values, when the schema constrains them
+	Default  string    // the schema's default, rendered for display
+	Format   string    // a string format hint (e.g. date-time, uri, email)
+}
+
+// hint is the most useful thing to show in an empty field: the allowed values,
+// then the default, then the format. It is empty when the schema says nothing
+// extra, since the type already labels the field.
+func (a Arg) hint() string {
+	switch {
+	case len(a.Enum) > 0:
+		return strings.Join(a.Enum, " | ")
+	case a.Default != "":
+		return "default " + a.Default
+	case a.Format != "":
+		return a.Format
+	default:
+		return ""
+	}
 }
 
 // toolArgs reads a tool's input schema into an ordered argument list: required
@@ -54,6 +74,9 @@ func toolArgs(t *sdk.Tool) []Arg {
 			Type:     asString(p["type"]),
 			Desc:     asString(p["description"]),
 			Required: required[name],
+			Enum:     asStrings(p["enum"]),
+			Default:  asString(p["default"]),
+			Format:   asString(p["format"]),
 		})
 	}
 	return args
@@ -64,4 +87,19 @@ func asString(v any) string {
 		return ""
 	}
 	return fmt.Sprint(v)
+}
+
+// asStrings flattens a JSON enum array to display strings, skipping a nil entry.
+func asStrings(v any) []string {
+	list, ok := v.([]any)
+	if !ok || len(list) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(list))
+	for _, e := range list {
+		if e != nil {
+			out = append(out, fmt.Sprint(e))
+		}
+	}
+	return out
 }
