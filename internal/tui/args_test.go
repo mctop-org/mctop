@@ -42,6 +42,18 @@ func TestToolArgsReadsEnumDefaultFormat(t *testing.T) {
 	}
 }
 
+func TestSearchMatchesDescription(t *testing.T) {
+	m := model{tools: []*sdk.Tool{
+		{Name: "alpha", Description: "convert between timezones"},
+		{Name: "beta", Description: "fetch a url"},
+	}}
+	m.query = "between" // appears only in alpha's description
+	vis := m.visibleItems()
+	if len(vis) != 1 || vis[0] != 0 {
+		t.Fatalf("want only alpha to match by description, got %v", vis)
+	}
+}
+
 func TestArgHintPrefersEnumThenDefaultThenFormat(t *testing.T) {
 	cases := []struct {
 		name string

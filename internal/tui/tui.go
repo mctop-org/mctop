@@ -357,16 +357,33 @@ func (m model) open() (tea.Model, tea.Cmd) {
 }
 
 // visibleItems is the indices of the active section's items matching the search
-// query, or all of them when the query is empty.
+// query, or all of them when the query is empty. The query matches an item's
+// name and its description, since a user often recalls what a tool does rather
+// than its exact name.
 func (m model) visibleItems() []int {
 	q := strings.ToLower(m.query)
 	var idx []int
 	for i := 0; i < m.count(m.section); i++ {
-		if q == "" || strings.Contains(strings.ToLower(m.itemLabel(m.section, i)), q) {
+		if q == "" || strings.Contains(m.itemHaystack(m.section, i), q) {
 			idx = append(idx, i)
 		}
 	}
 	return idx
+}
+
+// itemHaystack is the lower-cased text a search query is matched against: the
+// item's label plus its description.
+func (m model) itemHaystack(s section, i int) string {
+	switch s {
+	case secTools:
+		return strings.ToLower(m.tools[i].Name + " " + m.tools[i].Description)
+	case secResources:
+		r := m.resources[i]
+		return strings.ToLower(r.URI + " " + r.Name + " " + r.Description)
+	default:
+		p := m.prompts[i]
+		return strings.ToLower(p.Name + " " + p.Description)
+	}
 }
 
 // selected returns the real item index under the cursor, or -1 when nothing is
