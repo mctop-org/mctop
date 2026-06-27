@@ -1,7 +1,7 @@
 # mctop
 
-[![release](https://img.shields.io/github/v/release/aloki-alok/mctop?label=release)](https://github.com/aloki-alok/mctop/releases)
-[![ci](https://img.shields.io/github/actions/workflow/status/aloki-alok/mctop/ci.yml?branch=main&label=ci)](https://github.com/aloki-alok/mctop/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/mctop/mctop?label=release)](https://github.com/mctop/mctop/releases)
+[![ci](https://img.shields.io/github/actions/workflow/status/mctop/mctop/ci.yml?branch=main&label=ci)](https://github.com/mctop/mctop/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 
 A terminal client for MCP servers. Connect to any server, browse its tools,
@@ -24,14 +24,14 @@ Think `curl` and `k9s`, but for the Model Context Protocol.
 ## Install
 
 ```
-curl -fsSL https://raw.githubusercontent.com/aloki-alok/mctop/main/install.sh | sh
+curl -fsSL https://mctop.org/install | sh
 ```
 
 Or with Homebrew, or the Go toolchain:
 
 ```
-brew install aloki-alok/tap/mctop
-go install github.com/aloki-alok/mctop@latest
+brew install mctop/tap/mctop
+go install github.com/mctop/mctop@latest
 ```
 
 Then `mctop upgrade` keeps it current, however you installed it.

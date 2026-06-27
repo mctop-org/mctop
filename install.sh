@@ -1,11 +1,11 @@
 #!/bin/sh
 # Install the latest mctop release. Usage:
-#   curl -fsSL https://raw.githubusercontent.com/aloki-alok/mctop/main/install.sh | sh
+#   curl -fsSL https://mctop.org/install | sh
 # Override the install directory with MCTOP_INSTALL_DIR (default /usr/local/bin,
 # falling back to $HOME/.local/bin when that is not writable).
 set -eu
 
-REPO="aloki-alok/mctop"
+REPO="mctop/mctop"
 
 err() {
 	echo "install: $1" >&2

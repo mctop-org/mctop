@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/aloki-alok/mctop/internal/mcp"
+	"github.com/mctop/mctop/internal/mcp"
 )
 
 // Call invokes one tool and prints its result. Arguments are given as key=value

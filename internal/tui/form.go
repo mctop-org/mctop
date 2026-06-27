@@ -13,7 +13,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/aloki-alok/mctop/internal/mcp"
+	"github.com/mctop/mctop/internal/mcp"
 )
 
 const callTimeout = 60 * time.Second

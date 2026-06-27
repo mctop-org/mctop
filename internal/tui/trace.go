@@ -7,7 +7,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/aloki-alok/mctop/internal/mcp"
+	"github.com/mctop/mctop/internal/mcp"
 )
 
 // traceBody renders the recorded protocol frames for the trace overlay: each

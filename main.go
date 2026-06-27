@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/aloki-alok/mctop/internal/cli"
-	"github.com/aloki-alok/mctop/internal/ui"
+	"github.com/mctop/mctop/internal/cli"
+	"github.com/mctop/mctop/internal/ui"
 )
 
 // version is overridden at release time via -ldflags.

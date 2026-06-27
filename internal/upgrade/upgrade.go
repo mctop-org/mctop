@@ -21,7 +21,7 @@ import (
 	"github.com/minio/selfupdate"
 )
 
-const releaseAPI = "https://api.github.com/repos/aloki-alok/mctop/releases/latest"
+const releaseAPI = "https://api.github.com/repos/mctop/mctop/releases/latest"
 
 type release struct {
 	TagName string `json:"tag_name"`

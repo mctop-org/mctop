@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/aloki-alok/mctop/internal/mcp"
-	"github.com/aloki-alok/mctop/internal/ui"
+	"github.com/mctop/mctop/internal/mcp"
+	"github.com/mctop/mctop/internal/ui"
 )
 
 // LS connects to the target and prints its tools, resources, and prompts.

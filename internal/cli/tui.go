@@ -10,8 +10,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/aloki-alok/mctop/internal/mcp"
-	"github.com/aloki-alok/mctop/internal/tui"
+	"github.com/mctop/mctop/internal/mcp"
+	"github.com/mctop/mctop/internal/tui"
 )
 
 // TUI connects to a target and opens the interactive browser. It is what a bare

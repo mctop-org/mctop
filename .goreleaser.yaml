@@ -29,10 +29,10 @@ checksum:
 homebrew_casks:
   - name: mctop
     repository:
-      owner: aloki-alok
+      owner: mctop
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    homepage: "https://github.com/aloki-alok/mctop"
+    homepage: "https://github.com/mctop/mctop"
     description: "A terminal client for MCP servers: explore, call, and CI-test any server."
     license: "MIT"
     # Strip the quarantine flag so the unsigned binary runs without a Gatekeeper prompt.
@@ -45,7 +45,7 @@ homebrew_casks:
 
 release:
   github:
-    owner: aloki-alok
+    owner: mctop
     name: mctop
 
 changelog:

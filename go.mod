@@ -1,4 +1,4 @@
-module github.com/aloki-alok/mctop
+module github.com/mctop/mctop
 
 go 1.26.4
 

@@ -15,8 +15,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/aloki-alok/mctop/internal/config"
-	"github.com/aloki-alok/mctop/internal/mcp"
+	"github.com/mctop/mctop/internal/config"
+	"github.com/mctop/mctop/internal/mcp"
 )
 
 // chromeHeight is the lines the header (2) and footer (2) occupy, reserved from

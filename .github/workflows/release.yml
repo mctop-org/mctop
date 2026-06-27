@@ -23,6 +23,6 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # A PAT with repo scope on aloki-alok/homebrew-tap, so the cask can be
+          # A PAT with repo scope on mctop/homebrew-tap, so the cask can be
           # pushed there. Set it in repo Settings, Secrets, Actions.
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}

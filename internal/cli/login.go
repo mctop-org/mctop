@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/aloki-alok/mctop/internal/oauth"
+	"github.com/mctop/mctop/internal/oauth"
 )
 
 // Login runs the OAuth flow for an http(s) MCP server and caches the token so

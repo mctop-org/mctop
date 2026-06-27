@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/aloki-alok/mctop/internal/mcp"
-	"github.com/aloki-alok/mctop/internal/spec"
-	"github.com/aloki-alok/mctop/internal/ui"
+	"github.com/mctop/mctop/internal/mcp"
+	"github.com/mctop/mctop/internal/spec"
+	"github.com/mctop/mctop/internal/ui"
 )
 
 // Test runs a contract spec against its server and exits 0 when every check
