@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mctop/mctop/internal/mcp"
-	"github.com/mctop/mctop/internal/ui"
+	"github.com/mctop-org/mctop/internal/mcp"
+	"github.com/mctop-org/mctop/internal/ui"
 )
 
 // LS connects to the target and prints its tools, resources, and prompts.

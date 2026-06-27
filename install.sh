@@ -5,7 +5,7 @@
 # falling back to $HOME/.local/bin when that is not writable).
 set -eu
 
-REPO="mctop/mctop"
+REPO="mctop-org/mctop"
 
 err() {
 	echo "install: $1" >&2

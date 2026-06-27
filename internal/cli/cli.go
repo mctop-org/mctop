@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mctop/mctop/internal/mcp"
+	"github.com/mctop-org/mctop/internal/mcp"
 )
 
 // dialTimeout bounds connecting to and querying a server, so a stuck server

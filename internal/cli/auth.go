@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mctop/mctop/internal/oauth"
+	"github.com/mctop-org/mctop/internal/oauth"
 )
 
 // withAuth adds a cached OAuth bearer token to the headers for an http(s)

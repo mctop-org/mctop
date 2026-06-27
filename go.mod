@@ -1,4 +1,4 @@
-module github.com/mctop/mctop
+module github.com/mctop-org/mctop
 
 go 1.26.4
 

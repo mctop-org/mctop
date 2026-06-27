@@ -1,7 +1,7 @@
 # mctop
 
-[![release](https://img.shields.io/github/v/release/mctop/mctop?label=release)](https://github.com/mctop/mctop/releases)
-[![ci](https://img.shields.io/github/actions/workflow/status/mctop/mctop/ci.yml?branch=main&label=ci)](https://github.com/mctop/mctop/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/mctop-org/mctop?label=release)](https://github.com/mctop-org/mctop/releases)
+[![ci](https://img.shields.io/github/actions/workflow/status/mctop-org/mctop/ci.yml?branch=main&label=ci)](https://github.com/mctop-org/mctop/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 
 A terminal client for MCP servers. Connect to any server, browse its tools,
@@ -30,8 +30,8 @@ curl -fsSL https://mctop.org/install | sh
 Or with Homebrew, or the Go toolchain:
 
 ```
-brew install mctop/tap/mctop
-go install github.com/mctop/mctop@latest
+brew install mctop-org/tap/mctop
+go install github.com/mctop-org/mctop@latest
 ```
 
 Then `mctop upgrade` keeps it current, however you installed it.

@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/mctop/mctop/internal/upgrade"
+	"github.com/mctop-org/mctop/internal/upgrade"
 )
 
 // Upgrade replaces the running binary with the latest release. version is this

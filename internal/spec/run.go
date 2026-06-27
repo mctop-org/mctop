@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mctop/mctop/internal/mcp"
+	"github.com/mctop-org/mctop/internal/mcp"
 )
 
 // Result is the outcome of one checked invariant.
