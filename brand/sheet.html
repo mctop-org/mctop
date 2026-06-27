@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+@font-face{font-family:"Anthrosevka Mono";src:url("fonts/AnthrosevkaMono-Regular.ttf");font-weight:400}
+@font-face{font-family:"Anthrosevka Mono";src:url("fonts/AnthrosevkaMono-Bold.ttf");font-weight:700}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Anthrosevka Mono",monospace}
+.theme{padding:56px 64px}
+.dawn{--bg:#faf4ed;--tx:#575279;--sub:#9893a5;--iris:#907aa9;--foam:#56949f;--gold:#ea9d34;--pine:#286983}
+.main{--bg:#191724;--tx:#e0def4;--sub:#6e6a86;--iris:#c4a7e7;--foam:#9ccfd8;--gold:#f6c177;--pine:#31748f}
+.theme{background:var(--bg);color:var(--tx)}
+.label{font-size:13px;color:var(--sub);margin-bottom:48px;letter-spacing:1px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 8px}
+.cell{height:200px;display:flex;flex-direction:column;justify-content:center;padding:0 40px;border:1px solid color-mix(in srgb,var(--sub) 28%,transparent)}
+.n{font-size:12px;color:var(--sub);margin-bottom:26px}
+.mark{display:flex;align-items:center;gap:18px;font-size:52px;font-weight:700;line-height:1}
+.wm{letter-spacing:0}
+.cap{font-size:12px;color:var(--sub);margin-top:26px;font-weight:400}
+
+/* 1 block cursor */
+.curblk{display:inline-block;width:.52em;height:1.02em;background:var(--iris);transform:translateY(.08em);margin-left:.06em}
+/* 2 accent dot */
+.dot{color:var(--iris)}
+/* 3 prompt caret */
+.caret{color:var(--iris)}
+/* 5 brackets */
+.br{color:var(--iris);font-weight:400}
+</style>
+</head>
+<body>
+<div id="sheets"></div>
+<script>
+const concepts = [
+  {n:'01  block cursor', cap:'terminal prompt, blinking block',
+   html:`<span class="wm">mctop</span><span class="curblk"></span>`},
+  {n:'02  accent dot', cap:'quiet, and it spells the domain: mctop.org',
+   html:`<span class="wm">mctop</span><span class="dot">.</span>`},
+  {n:'03  prompt caret', cap:'a shell prompt before the name',
+   html:`<span class="caret">&#10095;</span><span class="wm">mctop</span>`},
+  {n:'04  meter mark', cap:'htop-style meters; the on-theme statement piece',
+   html:`<svg width="62" height="62" viewBox="0 0 62 62" fill="none">
+      <rect x="2" y="8"  width="58" height="9" rx="2" fill="currentColor" opacity="0.14"/>
+      <rect x="2" y="8"  width="44" height="9" rx="2" fill="var(--iris)"/>
+      <rect x="2" y="22" width="58" height="9" rx="2" fill="currentColor" opacity="0.14"/>
+      <rect x="2" y="22" width="26" height="9" rx="2" fill="var(--foam)"/>
+      <rect x="2" y="36" width="58" height="9" rx="2" fill="currentColor" opacity="0.14"/>
+      <rect x="2" y="36" width="52" height="9" rx="2" fill="var(--gold)"/>
+      <rect x="2" y="50" width="58" height="9" rx="2" fill="currentColor" opacity="0.14"/>
+      <rect x="2" y="50" width="16" height="9" rx="2" fill="var(--pine)"/>
+    </svg><span class="wm">mctop</span>`},
+  {n:'05  brackets', cap:'a selector / tag feel',
+   html:`<span class="br">[</span><span class="wm">mctop</span><span class="br">]</span>`},
+  {n:'06  connector', cap:'client to server, the protocol link',
+   html:`<svg width="70" height="40" viewBox="0 0 70 40" fill="none">
+      <rect x="2" y="11" width="18" height="18" rx="4" fill="var(--iris)"/>
+      <line x1="20" y1="20" x2="50" y2="20" stroke="currentColor" stroke-width="3" opacity="0.5"/>
+      <rect x="50" y="11" width="18" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="3"/>
+    </svg><span class="wm">mctop</span>`},
+];
+function sheet(theme, title){
+  const cells = concepts.map(c=>`<div class="cell"><div class="n">${c.n}</div><div class="mark">${c.html}</div><div class="cap">${c.cap}</div></div>`).join('');
+  return `<div class="theme ${theme}"><div class="label">${title}</div><div class="grid">${cells}</div></div>`;
+}
+document.getElementById('sheets').innerHTML =
+  sheet('dawn','MCTOP / LOGO CONCEPTS  ·  ROSE PINE DAWN (light)') +
+  sheet('main','MCTOP / LOGO CONCEPTS  ·  ROSE PINE MAIN (dark)');
+</script>
+</body>
+</html>
