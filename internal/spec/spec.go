@@ -15,37 +15,37 @@ import (
 // calls whose results must hold.
 type Spec struct {
 	Server Server `yaml:"server"`
-	Expect Expect `yaml:"expect"`
-	Calls  []Call `yaml:"calls"`
+	Expect Expect `yaml:"expect,omitempty"`
+	Calls  []Call `yaml:"calls,omitempty"`
 }
 
 // Server locates the server under test. Exactly one of Command or URL is set.
 // Headers are sent with each HTTP request; their values are expanded against the
 // environment ($TOKEN, ${TOKEN}) so a secret stays out of the committed spec.
 type Server struct {
-	Command string            `yaml:"command"`
-	URL     string            `yaml:"url"`
-	Headers map[string]string `yaml:"headers"`
-	SSE     bool              `yaml:"sse"` // dial a URL over legacy HTTP+SSE instead of streamable HTTP
+	Command string            `yaml:"command,omitempty"`
+	URL     string            `yaml:"url,omitempty"`
+	Headers map[string]string `yaml:"headers,omitempty"`
+	SSE     bool              `yaml:"sse,omitempty"` // dial a URL over legacy HTTP+SSE instead of streamable HTTP
 }
 
 // Expect lists invariants about the server's surface.
 type Expect struct {
-	Tools []string `yaml:"tools"`
+	Tools []string `yaml:"tools,omitempty"`
 }
 
 // Call invokes a tool and asserts on its result.
 type Call struct {
 	Tool   string         `yaml:"tool"`
-	Args   map[string]any `yaml:"args"`
-	Assert Assert         `yaml:"assert"`
+	Args   map[string]any `yaml:"args,omitempty"`
+	Assert Assert         `yaml:"assert,omitempty"`
 }
 
 // Assert holds the conditions a call's result must satisfy. NotError defaults to
 // true when omitted, since a call is expected to succeed unless stated.
 type Assert struct {
-	NotError *bool  `yaml:"not_error"`
-	Contains string `yaml:"contains"`
+	NotError *bool  `yaml:"not_error,omitempty"`
+	Contains string `yaml:"contains,omitempty"`
 }
 
 // Target returns the server target string the mcp client understands.
