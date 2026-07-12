@@ -35,7 +35,18 @@ type callResultMsg struct {
 // openForm switches to the argument form for a tool, building one text field per
 // argument and focusing the first.
 func (m model) openForm(tool *sdk.Tool) model {
-	args := toolArgs(tool)
+	m.formTool, m.formPrompt = tool, nil
+	return m.openArgsForm(toolArgs(tool))
+}
+
+// openPromptForm is the same form over a prompt's arguments; only called when
+// the prompt declares at least one.
+func (m model) openPromptForm(p *sdk.Prompt) model {
+	m.formTool, m.formPrompt = nil, p
+	return m.openArgsForm(promptArgs(p))
+}
+
+func (m model) openArgsForm(args []Arg) model {
 	inputs := make([]formInput, len(args))
 	for i, a := range args {
 		ti := textinput.New()
@@ -46,13 +57,20 @@ func (m model) openForm(tool *sdk.Tool) model {
 	if len(inputs) > 0 {
 		inputs[0].input.Focus()
 	}
-	m.formTool = tool
 	m.inputs = inputs
 	m.focus = 0
 	m.formMsg = ""
 	m.screen = form
 	m.output, m.resultErr, m.elapsed = "", nil, ""
 	return m
+}
+
+// formName is what the active form runs: the tool's or the prompt's name.
+func (m model) formName() string {
+	if m.formPrompt != nil {
+		return m.formPrompt.Name
+	}
+	return m.formTool.Name
 }
 
 func (m model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -70,6 +88,9 @@ func (m model) updateForm(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			m.formMsg = ""
+			if m.formPrompt != nil {
+				return m.dispatch(m.formPrompt.Name, m.getPrompt(m.formPrompt.Name, collectStringArgs(m.inputs)))
+			}
 			return m.dispatch(m.formTool.Name, m.runCall())
 		case "tab", "down":
 			m.formMsg = ""
@@ -150,13 +171,13 @@ func (m model) readResource(uri string) tea.Cmd {
 	}
 }
 
-func (m model) getPrompt(name string) tea.Cmd {
+func (m model) getPrompt(name string, args map[string]string) tea.Cmd {
 	client, parent := m.client, m.ctx
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(parent, callTimeout)
 		defer cancel()
 		start := time.Now()
-		res, err := client.GetPrompt(ctx, name, nil)
+		res, err := client.GetPrompt(ctx, name, args)
 		elapsed := time.Since(start).Round(time.Millisecond).String()
 		if err != nil {
 			return callResultMsg{err: err, elapsed: elapsed}
@@ -180,6 +201,19 @@ func collectArgs(inputs []formInput) map[string]any {
 			v = raw
 		}
 		args[fi.arg.Name] = v
+	}
+	return args
+}
+
+// collectStringArgs reads the filled fields as-is for a prompt render: prompt
+// arguments are typed as strings by the protocol, so no JSON coercion — "5"
+// stays "5". Blanks are omitted like collectArgs.
+func collectStringArgs(inputs []formInput) map[string]string {
+	args := make(map[string]string)
+	for _, fi := range inputs {
+		if raw := strings.TrimSpace(fi.input.Value()); raw != "" {
+			args[fi.arg.Name] = raw
+		}
 	}
 	return args
 }
@@ -256,7 +290,7 @@ func (m model) updateResult(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.expandRow()
 		}
 	case "e":
-		if m.formTool != nil {
+		if m.formTool != nil || m.formPrompt != nil {
 			m.screen = form
 		}
 	case "r":
@@ -370,7 +404,7 @@ func (m model) viewForm() string {
 	bh := m.bodyHeight()
 	body := lipgloss.NewStyle().Height(bh).MaxHeight(bh).Padding(1, 3).Render(m.formBody())
 	footer := m.rule() + "\n" + dim.Render("  tab field  ·  enter run  ·  esc back")
-	return m.layout(m.header(m.formTool.Name, dim.Render("fill arguments")), body, footer)
+	return m.layout(m.header(m.formName(), dim.Render("fill arguments")), body, footer)
 }
 
 func (m model) formBody() string {
@@ -550,7 +584,7 @@ func (m model) viewResult() string {
 	default:
 		keys = "  ↑↓ scroll  ·  esc back  ·  r re-run"
 	}
-	if m.formTool != nil {
+	if m.formTool != nil || m.formPrompt != nil {
 		keys += "  ·  e edit"
 	}
 	switch {
