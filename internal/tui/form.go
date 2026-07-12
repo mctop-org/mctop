@@ -118,6 +118,7 @@ func (m model) runCall() tea.Cmd {
 	args := collectArgs(m.inputs)
 	client := m.client
 	parent := m.ctx
+	onCall := m.onCall
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(parent, callTimeout)
 		defer cancel()
@@ -126,6 +127,9 @@ func (m model) runCall() tea.Cmd {
 		elapsed := time.Since(start).Round(time.Millisecond).String()
 		if err != nil {
 			return callResultMsg{err: err, elapsed: elapsed}
+		}
+		if onCall != nil {
+			onCall(tool, args, res.IsError)
 		}
 		out := mcp.RenderResult(res)
 		if res.IsError {
