@@ -70,6 +70,11 @@ func newSpinner() spinner.Model {
 
 // model holds the connected session and the state of whichever screen is
 // active: the browse cursor, the open form, and the last result.
+// CallHook observes each completed tool call (recording, for now). It runs on
+// a background command goroutine, so implementations must be safe for
+// concurrent use.
+type CallHook func(tool string, args map[string]any, isError bool)
+
 type model struct {
 	ctx       context.Context
 	server    string
@@ -77,6 +82,7 @@ type model struct {
 	tools     []*sdk.Tool
 	resources []*sdk.Resource
 	prompts   []*sdk.Prompt
+	onCall    CallHook // nil when nothing observes calls
 
 	screen    screen
 	section   section
@@ -126,8 +132,9 @@ func (m model) dispatch(title string, cmd tea.Cmd) (tea.Model, tea.Cmd) {
 }
 
 // New builds the model from an already-connected client and its loaded surface.
-func New(ctx context.Context, server string, client *mcp.Client, tools []*sdk.Tool, resources []*sdk.Resource, prompts []*sdk.Prompt) tea.Model {
-	return model{ctx: ctx, server: server, client: client, tools: tools, resources: resources, prompts: prompts, vim: config.Load().Vim, vp: viewport.New(0, 0), traceVP: viewport.New(0, 0), spin: newSpinner()}
+// onCall may be nil.
+func New(ctx context.Context, server string, client *mcp.Client, tools []*sdk.Tool, resources []*sdk.Resource, prompts []*sdk.Prompt, onCall CallHook) tea.Model {
+	return model{ctx: ctx, server: server, client: client, tools: tools, resources: resources, prompts: prompts, onCall: onCall, vim: config.Load().Vim, vp: viewport.New(0, 0), traceVP: viewport.New(0, 0), spin: newSpinner()}
 }
 
 func (m model) Init() tea.Cmd { return nil }

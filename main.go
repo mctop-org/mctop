@@ -44,8 +44,7 @@ func run(args []string) int {
 	case "upgrade":
 		return cli.Upgrade(version)
 	case "record":
-		fmt.Fprintf(os.Stderr, "mctop: %q is not implemented yet\n", args[0])
-		return 2
+		return cli.Record(args[1:])
 	default:
 		// A bare http(s):// URL or spawn command opens the interactive TUI.
 		return cli.TUI(args)
@@ -86,6 +85,7 @@ Usage:
   mctop ls <target>           list tools, resources, and prompts
   mctop call <target> <tool>  call one tool and print the result
   mctop test <spec.yaml>      run a contract, exit 0 on pass, 1 on fail
+  mctop record <target>       browse a server and save the calls as a spec (-o spec.yaml)
   mctop login <url>           log in to an OAuth-protected server
   mctop logout <url>          forget a server's cached token
   mctop upgrade               update mctop to the latest release
