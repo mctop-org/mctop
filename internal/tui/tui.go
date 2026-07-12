@@ -89,8 +89,11 @@ type model struct {
 
 	width, height int
 
-	// form and result state, populated when those screens are active.
+	// form and result state, populated when those screens are active. At most
+	// one of formTool and formPrompt is set; it is what the form runs on enter
+	// and what e re-edits from the result screen.
 	formTool    *sdk.Tool
+	formPrompt  *sdk.Prompt
 	inputs      []formInput
 	focus       int
 	formMsg     string // a validation message shown under the form, e.g. a missing required field
@@ -337,7 +340,7 @@ func (m model) updateSearch(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // open acts on the selected item: a tool opens its argument form, a resource is
-// read, and a prompt is rendered.
+// read, and a prompt is rendered — via its own argument form when it takes any.
 func (m model) open() (tea.Model, tea.Cmd) {
 	i := m.selected()
 	if i < 0 {
@@ -347,13 +350,16 @@ func (m model) open() (tea.Model, tea.Cmd) {
 	case secTools:
 		return m.openForm(m.tools[i]), textinput.Blink
 	case secResources:
-		m.formTool = nil
+		m.formTool, m.formPrompt = nil, nil
 		r := m.resources[i]
 		return m.dispatch(r.URI, m.readResource(r.URI))
 	default:
-		m.formTool = nil
 		p := m.prompts[i]
-		return m.dispatch(p.Name, m.getPrompt(p.Name))
+		if len(p.Arguments) > 0 {
+			return m.openPromptForm(p), textinput.Blink
+		}
+		m.formTool, m.formPrompt = nil, nil
+		return m.dispatch(p.Name, m.getPrompt(p.Name, nil))
 	}
 }
 
@@ -646,7 +652,11 @@ func (m model) detail(s section, i int) string {
 		return head + "\n\n" + r.Description + "\n\n" + dim.Render("enter") + dim.Render(" to read")
 	default:
 		p := m.prompts[i]
-		return bold.Render(p.Name) + "\n\n" + p.Description + "\n\n" + accent.Render("enter") + dim.Render(" to render")
+		var b strings.Builder
+		b.WriteString(bold.Render(p.Name) + "\n\n" + p.Description)
+		b.WriteString(argsDetail(promptArgs(p)))
+		b.WriteString("\n\n" + accent.Render("enter") + dim.Render(" to render"))
+		return b.String()
 	}
 }
 
@@ -656,26 +666,35 @@ func (m model) toolDetail(t *sdk.Tool) string {
 	if t.Description != "" {
 		b.WriteString("\n\n" + t.Description)
 	}
-	if args := toolArgs(t); len(args) > 0 {
-		b.WriteString("\n\n" + dim.Render("ARGUMENTS"))
-		for _, a := range args {
-			name := bold.Render(a.Name)
-			if a.Required {
-				name += accent.Render("*")
-			}
-			b.WriteString("\n\n" + name + "  " + dim.Render(a.Type))
-			if a.Desc != "" {
-				b.WriteString("\n" + dim.Render(a.Desc))
-			}
-			if len(a.Enum) > 0 {
-				b.WriteString("\n" + dim.Render("one of: ") + dim.Render(strings.Join(a.Enum, ", ")))
-			}
-			if a.Default != "" {
-				b.WriteString("\n" + dim.Render("default: "+a.Default))
-			}
+	b.WriteString(argsDetail(toolArgs(t)))
+	b.WriteString("\n\n" + accent.Render("enter") + dim.Render(" to call"))
+	return b.String()
+}
+
+// argsDetail is the ARGUMENTS block of a details pane, shared by tools and
+// prompts. Empty when there are none.
+func argsDetail(args []Arg) string {
+	if len(args) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("\n\n" + dim.Render("ARGUMENTS"))
+	for _, a := range args {
+		name := bold.Render(a.Name)
+		if a.Required {
+			name += accent.Render("*")
+		}
+		b.WriteString("\n\n" + name + "  " + dim.Render(a.Type))
+		if a.Desc != "" {
+			b.WriteString("\n" + dim.Render(a.Desc))
+		}
+		if len(a.Enum) > 0 {
+			b.WriteString("\n" + dim.Render("one of: ") + dim.Render(strings.Join(a.Enum, ", ")))
+		}
+		if a.Default != "" {
+			b.WriteString("\n" + dim.Render("default: "+a.Default))
 		}
 	}
-	b.WriteString("\n\n" + accent.Render("enter") + dim.Render(" to call"))
 	return b.String()
 }
 
