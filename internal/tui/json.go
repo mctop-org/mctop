@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -221,7 +222,7 @@ func renderObjectTable(rows []*object, width, selected int) (string, bool) {
 	hidden := 0
 	if maxCols := clamp(width/18, 2, 8); len(cols) > maxCols {
 		hidden = len(cols) - maxCols
-		cols = cols[:maxCols]
+		cols = pickColumns(cols, maxCols)
 	}
 	headers := append([]string{"#"}, cols...)
 
@@ -310,6 +311,50 @@ func renderObjectTable(rows []*object, width, selected int) (string, bool) {
 		b.WriteString("\n" + gutter + dim.Render(note))
 	}
 	return b.String(), true
+}
+
+// pickColumns keeps n of cols when a record is too wide to show whole,
+// preferring the fields that identify a row (ids, then names, status, dates)
+// over the rest. The survivors keep their declared order; the heuristic only
+// decides which ones make the cut.
+func pickColumns(cols []string, n int) []string {
+	if len(cols) <= n {
+		return cols
+	}
+	idx := make([]int, len(cols))
+	for i := range idx {
+		idx[i] = i
+	}
+	sort.SliceStable(idx, func(a, b int) bool {
+		return columnRank(cols[idx[a]]) < columnRank(cols[idx[b]])
+	})
+	keep := idx[:n]
+	sort.Ints(keep)
+	out := make([]string, n)
+	for i, j := range keep {
+		out[i] = cols[j]
+	}
+	return out
+}
+
+// columnRank orders field names by how well they identify a record. Ties keep
+// their declared order via the stable sort in pickColumns.
+func columnRank(name string) int {
+	l := strings.ToLower(name)
+	switch {
+	case l == "id" || l == "uuid" || strings.HasSuffix(l, "_id"):
+		return 0
+	case l == "name" || l == "title" || l == "label" || l == "subject":
+		return 1
+	case l == "status" || l == "state" || l == "type" || l == "kind":
+		return 2
+	case l == "date" || l == "created" || l == "updated" || l == "timestamp" ||
+		strings.HasSuffix(l, "_at") || strings.HasSuffix(l, "_date") ||
+		strings.HasSuffix(l, "_time") || strings.HasSuffix(l, "_on"):
+		return 3
+	default:
+		return 4
+	}
 }
 
 // orderedColumns is the union of the rows' keys in first-seen order.
