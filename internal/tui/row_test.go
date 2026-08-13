@@ -127,6 +127,42 @@ func TestTableCapsColumns(t *testing.T) {
 	}
 }
 
+// A wide record buries its identifying fields among filler (the shape of a
+// crowded analytics payload); the capped table must surface them anyway.
+func TestWideTableSurfacesIdentifyingColumns(t *testing.T) {
+	var fields []string
+	for i := 0; i < 10; i++ {
+		fields = append(fields, fmt.Sprintf(`"total_metric_%d":%d`, i, i))
+	}
+	fields = append(fields, `"call_id":"c-1"`, `"status":"done"`, `"created_at":"2026-07-12"`)
+	raw := `[{` + strings.Join(fields, ",") + `}]`
+	got, ok := renderObjectTable(asObjectRows(decodeMust(raw)), 100, 0)
+	if !ok {
+		t.Fatal("should render")
+	}
+	plain := stripANSI(got)
+	for _, want := range []string{"call_id", "status", "created_at"} {
+		if !strings.Contains(plain, want) {
+			t.Errorf("identifying column %q should survive the cap:\n%s", want, plain)
+		}
+	}
+	if !strings.Contains(plain, "more fields per record") {
+		t.Fatal("the hidden-fields note should still show")
+	}
+}
+
+func TestPickColumnsKeepsDeclaredOrder(t *testing.T) {
+	cols := []string{"zeta", "status", "id", "alpha"}
+	got := pickColumns(cols, 2)
+	if len(got) != 2 || got[0] != "status" || got[1] != "id" {
+		t.Fatalf("want the ranked survivors in declared order [status id], got %v", got)
+	}
+	all := pickColumns(cols, 4)
+	if len(all) != 4 || all[0] != "zeta" {
+		t.Fatalf("no cap means untouched order, got %v", all)
+	}
+}
+
 func TestRowNavigationMovesSelectsAndExpands(t *testing.T) {
 	m := tableModel() // three rows, vim on
 	m, _ = send(m, key("down"))

@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime/debug"
 	"strings"
 
 	"github.com/mctop-org/mctop/internal/cli"
@@ -15,7 +16,21 @@ import (
 var version = "0.0.0-dev"
 
 func main() {
+	version = resolveVersion()
 	os.Exit(run(os.Args[1:]))
+}
+
+// resolveVersion prefers the release ldflags value, then the module version Go
+// embeds in a `go install ...@vX.Y.Z` build, so those builds report their real
+// version instead of 0.0.0-dev.
+func resolveVersion() string {
+	if version != "0.0.0-dev" {
+		return version
+	}
+	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		return info.Main.Version
+	}
+	return version
 }
 
 func run(args []string) int {
