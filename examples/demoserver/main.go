@@ -42,6 +42,24 @@ func newServer() *sdk.Server {
 			return nil, addOut{Sum: in.A + in.B}, nil
 		})
 
+	s.AddPrompt(&sdk.Prompt{
+		Name:        "greeting",
+		Description: "A short greeting for someone, in a given tone.",
+		Arguments: []*sdk.PromptArgument{
+			{Name: "name", Description: "who to greet", Required: true},
+			{Name: "tone", Description: "e.g. formal, cheerful"},
+		},
+	}, func(_ context.Context, req *sdk.GetPromptRequest) (*sdk.GetPromptResult, error) {
+		tone := req.Params.Arguments["tone"]
+		if tone == "" {
+			tone = "friendly"
+		}
+		text := fmt.Sprintf("Write a %s greeting for %s.", tone, req.Params.Arguments["name"])
+		return &sdk.GetPromptResult{Messages: []*sdk.PromptMessage{
+			{Role: "user", Content: &sdk.TextContent{Text: text}},
+		}}, nil
+	})
+
 	return s
 }
 

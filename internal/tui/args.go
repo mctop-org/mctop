@@ -16,8 +16,8 @@ type Arg struct {
 	Desc     string
 	Required bool
 	Enum     []string // allowed values, when the schema constrains them
-	Default  string    // the schema's default, rendered for display
-	Format   string    // a string format hint (e.g. date-time, uri, email)
+	Default  string   // the schema's default, rendered for display
+	Format   string   // a string format hint (e.g. date-time, uri, email)
 }
 
 // hint is the most useful thing to show in an empty field: the allowed values,
@@ -77,6 +77,22 @@ func toolArgs(t *sdk.Tool) []Arg {
 			Enum:     asStrings(p["enum"]),
 			Default:  asString(p["default"]),
 			Format:   asString(p["format"]),
+		})
+	}
+	return args
+}
+
+// promptArgs flattens a prompt's argument list for the details pane and the
+// form. Prompt arguments are plain named strings (no JSON schema), so the type
+// is always string and the server's declared order is kept.
+func promptArgs(p *sdk.Prompt) []Arg {
+	args := make([]Arg, 0, len(p.Arguments))
+	for _, a := range p.Arguments {
+		args = append(args, Arg{
+			Name:     a.Name,
+			Type:     "string",
+			Desc:     a.Description,
+			Required: a.Required,
 		})
 	}
 	return args
