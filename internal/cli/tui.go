@@ -11,12 +11,19 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/mctop-org/mctop/internal/mcp"
+	"github.com/mctop-org/mctop/internal/spec"
 	"github.com/mctop-org/mctop/internal/tui"
 )
 
 // TUI connects to a target and opens the interactive browser. It is what a bare
 // "mctop <target>" runs.
 func TUI(args []string) int {
+	return runTUI(args, "")
+}
+
+// runTUI opens the interactive browser, recording the session's tool calls into
+// a spec at recordPath when one is given.
+func runTUI(args []string, recordPath string) int {
 	opts, rest, err := extractConn(args)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "mctop:", err)
@@ -27,6 +34,14 @@ func TUI(args []string) int {
 		return 2
 	}
 	target := strings.Join(rest, " ")
+
+	// The recorder sees only the headers the user passed, captured before the
+	// token cache injects an Authorization header: a cached OAuth token is this
+	// machine's session, not part of the server's contract.
+	var rec *spec.Recorder
+	if recordPath != "" {
+		rec = spec.NewRecorder(target, opts.Headers, opts.SSE)
+	}
 
 	// ctx lives for the whole session and owns in-session calls, so it is only
 	// cancelled when the program exits.
@@ -84,10 +99,25 @@ func TUI(args []string) int {
 		return 1
 	}
 
-	program := tea.NewProgram(tui.New(ctx, target, client, tools, resources, prompts), tea.WithAltScreen())
+	var onCall tui.CallHook
+	if rec != nil {
+		onCall = rec.Record
+	}
+	program := tea.NewProgram(tui.New(ctx, target, client, tools, resources, prompts, onCall), tea.WithAltScreen())
 	if _, err := program.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "mctop:", err)
 		return 1
+	}
+	if rec != nil {
+		if rec.Len() == 0 {
+			fmt.Fprintln(os.Stderr, "mctop: no tool calls made, nothing recorded")
+			return 0
+		}
+		if err := rec.Write(recordPath); err != nil {
+			fmt.Fprintln(os.Stderr, "mctop:", err)
+			return 1
+		}
+		fmt.Printf("recorded %d call(s) to %s. run it with: mctop test %s\n", rec.Len(), recordPath, recordPath)
 	}
 	return 0
 }

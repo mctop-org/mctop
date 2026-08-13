@@ -44,6 +44,7 @@ mctop ls <target>              list tools, resources, and prompts
 mctop call <target> <tool>     call one tool and print the result
 mctop login <url>              log in to an OAuth-protected server
 mctop test <spec.yaml>         run a contract, exit 0 on pass, 1 on fail
+mctop record <target>          browse a server and save the calls as a spec
 mctop upgrade                  update to the latest release
 ```
 
@@ -126,6 +127,12 @@ calls:
 ```
 mctop test spec.yaml --report json
 ```
+
+You don't have to write a spec by hand: `mctop record <target> -o spec.yaml`
+opens the interactive client and saves every tool call you make as a spec step,
+asserting the error status it observed. Headers passed with `-H` are written as
+`$NAME` environment references, so the file is safe to commit. Sharpen the
+recorded steps with `contains` assertions where it strengthens the contract.
 
 ## Examples
 
