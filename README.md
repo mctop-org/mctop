@@ -146,4 +146,4 @@ mctop ls http://localhost:8080/mcp
 
 ## License
 
-MIT, see [LICENSE](./LICENSE).
+MIT, see [LICENSE](./LICENSE). Built by [Alok Ranjan](https://alokranjan.me/).
