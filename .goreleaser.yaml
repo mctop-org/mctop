@@ -36,12 +36,11 @@ homebrew_casks:
     description: "A terminal client for MCP servers: explore, call, and CI-test any server."
     license: "MIT"
     # Strip the quarantine flag so the unsigned binary runs without a Gatekeeper prompt.
+    # install_steps, not install: Homebrew deprecated Ruby postflight blocks in casks.
     hooks:
       post:
-        install: |
-          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/mctop"]
-          end
+        install_steps: |
+          run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ "{{" }}staged_path{{ "}}" }}/mctop"], must_succeed: false
 
 release:
   github:
